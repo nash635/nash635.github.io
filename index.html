@@ -1,11 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>nash635</title>
-</head>
-<body>
-    <h1>nash635的个人主页</h1>
-    <h1>Hello ~</h1>
-</body>
-</html>
+extends includes/layout.pug
+
+block content
+  include ./includes/mixins/post-ui.pug
+  #recent-posts.recent-posts
+    +postUI
+    include includes/pagination.pug
