@@ -10,32 +10,42 @@ favicon: /img/favicon.png
 
 # 网站Logo
 logo:
-  title: nash635's Blog
+  title: nash635
+  subtitle: For all time, always.
+
+# 网站样式
+style:
+  navbar:
+    effect: [shadow, floatable] # [shadow, floatable, blur]
+  sidebar:
+    effect: [shadow] # [shadow, floatable, blur]
 
 # 首页显示
 home:
-  title: 欢迎来到我的博客
-  subtitle: 记录生活，分享技术
+  title: 欢迎，旅行者
+  subtitle: 在这里记录生活点滴，分享技术心得
+  layout: auto # auto, list, grid
 
 #####################
 # 导航菜单
 #####################
 
+# 主导航卡片 (首页显示的大卡片)
 menubar:
   columns: 4
   items:
     - name: 博客
-      icon: solar:notebook-bold-duotone
+      icon: solar:home-bold-duotone
       url: /
-    - name: 标签
-      icon: solar:tag-bold-duotone  
-      url: /tags/
-    - name: 归档
-      icon: solar:calendar-bold-duotone
-      url: /archives/
-    - name: 关于
-      icon: solar:user-bold-duotone
-      url: /about/
+    - name: 项目  
+      icon: solar:code-square-bold-duotone
+      url: /wiki/
+    - name: 探索
+      icon: solar:planet-bold-duotone
+      url: /notes/
+    - name: 社交
+      icon: solar:heart-bold-duotone
+      url: /friends/
 
 #####################
 # 文章页面
@@ -54,6 +64,52 @@ article:
 related_posts:
   enable: true
   max_count: 5
+
+#####################
+# 页面布局
+#####################
+
+# 侧边栏组件
+sidebar:
+  widgets:
+    - widget: author
+      config:
+        avatar: /img/avatar.png
+        name: nash635
+        subtitle: For all time, always.
+        social:
+          - icon: solar:github-bold
+            url: https://github.com/nash635
+          - icon: solar:mail-bold
+            url: mailto:nash635@example.com
+    - widget: navigation
+      config:
+        items:
+          - name: 近期发布
+            icon: solar:clock-circle-bold-duotone
+            url: /
+          - name: 分类
+            icon: solar:folder-bold-duotone
+            url: /categories/
+          - name: 标签
+            icon: solar:tag-bold-duotone
+            url: /tags/
+          - name: 专栏
+            icon: solar:bookmark-bold-duotone
+            url: /topic/
+          - name: 归档
+            icon: solar:calendar-bold-duotone
+            url: /archives/
+          - name: 关于
+            icon: solar:user-bold-duotone
+            url: /about/
+    - widget: recent_posts
+      config:
+        limit: 5
+    - widget: categories
+    - widget: tags
+      config:
+        limit: 20
 
 #####################
 # 评论系统
@@ -77,14 +133,29 @@ search:
 #####################
 
 footer:
+  # 快速导航
+  navigation:
+    - name: 关于
+      icon: solar:user-bold-duotone
+      url: /about/
+    - name: 归档  
+      icon: solar:calendar-bold-duotone
+      url: /archives/
+    - name: 标签
+      icon: solar:tag-bold-duotone
+      url: /tags/
+    - name: 分类
+      icon: solar:folder-bold-duotone
+      url: /categories/
+  
   social_contact:
     - icon: solar:github-bold
       url: https://github.com/nash635
     - icon: solar:mail-bold
-      url: mailto:your-email@example.com
+      url: mailto:nash635@example.com
 
   copyright: |
-    本站由 [Hexo](https://hexo.io) 强力驱动，使用 [Stellar](https://github.com/xaoxuu/hexo-theme-stellar) 主题
+    本站由 @nash635 使用 [Stellar](https://github.com/xaoxuu/hexo-theme-stellar) 创建，持续记录生活与技术。
 
 #####################
 # 插件配置
@@ -93,12 +164,13 @@ footer:
 plugins:
   # 代码高亮
   highlight:
-    theme: default
+    theme: github
     clipboard: true
+    line_number: true
   
   # 数学公式支持
   mathjax:
-    enable: false
+    enable: true
 
 #####################
 # SEO优化
@@ -107,3 +179,21 @@ plugins:
 # Open Graph
 open_graph:
   enable: true
+  image: /img/og-image.png
+
+# 网站统计
+analytics:
+  # 可以配置 Google Analytics, 百度统计等
+
+#####################
+# 性能优化
+#####################
+
+# 压缩配置
+minify:
+  html:
+    enable: true
+  css:
+    enable: true
+  js:
+    enable: true
