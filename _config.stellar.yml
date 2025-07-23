@@ -1,0 +1,109 @@
+# Stellar 主题配置文件
+# 更多配置选项请参考：https://xaoxuu.com/wiki/stellar/
+
+#####################
+# 网站信息
+#####################
+
+# 网站图标
+favicon: /img/favicon.png
+
+# 网站Logo
+logo:
+  title: nash635's Blog
+
+# 首页显示
+home:
+  title: 欢迎来到我的博客
+  subtitle: 记录生活，分享技术
+
+#####################
+# 导航菜单
+#####################
+
+menubar:
+  columns: 4
+  items:
+    - name: 博客
+      icon: solar:notebook-bold-duotone
+      url: /
+    - name: 标签
+      icon: solar:tag-bold-duotone  
+      url: /tags/
+    - name: 归档
+      icon: solar:calendar-bold-duotone
+      url: /archives/
+    - name: 关于
+      icon: solar:user-bold-duotone
+      url: /about/
+
+#####################
+# 文章页面
+#####################
+
+article:
+  # 文章页面的侧边栏
+  sidebar:
+    position: right
+    for_page: [wiki, blog, post]
+    items:
+      - widget: toc
+      - widget: related_posts
+
+# 相关文章推荐
+related_posts:
+  enable: true
+  max_count: 5
+
+#####################
+# 评论系统
+#####################
+
+comments:
+  service: # 可以选择 giscus, disqus, valine, waline 等
+
+#####################
+# 搜索功能
+#####################
+
+search:
+  service: local_search
+  local_search:
+    field: all
+    path: /search.json
+
+#####################
+# 页脚
+#####################
+
+footer:
+  social_contact:
+    - icon: solar:github-bold
+      url: https://github.com/nash635
+    - icon: solar:mail-bold
+      url: mailto:your-email@example.com
+
+  copyright: |
+    本站由 [Hexo](https://hexo.io) 强力驱动，使用 [Stellar](https://github.com/xaoxuu/hexo-theme-stellar) 主题
+
+#####################
+# 插件配置
+#####################
+
+plugins:
+  # 代码高亮
+  highlight:
+    theme: default
+    clipboard: true
+  
+  # 数学公式支持
+  mathjax:
+    enable: false
+
+#####################
+# SEO优化
+#####################
+
+# Open Graph
+open_graph:
+  enable: true
