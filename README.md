@@ -83,6 +83,33 @@ npm run new "文章标题"
 - **Email**: nash635@example.com
 - **Blog**: [nash635.github.io](https://nash635.github.io)
 
+
+## 📦 发布流程
+
+本博客使用 **gh-pages 分支** 部署到 GitHub Pages。
+
+### 快速发布
+
+```bash
+# 1. 写文章并提交到 master
+git add source/_posts/新文章.md
+git commit -m "Add: 文章标题"
+git push
+
+# 2. 构建并部署
+npm run build
+cp -r public /tmp/hp
+git checkout gh-pages
+rm -rf _config* package* scaffolds source themes node_modules db.json .github README.md .gitignore public
+cp -r /tmp/hp/* . && rm -rf /tmp/hp
+git add -A && git commit -m "Deploy: 文章标题" && git push
+git checkout master
+```
+
+### GitHub Pages 设置
+
+确保 Settings → Pages → Branch 设置为 **gh-pages/(root)**
+
 ## 🙏 致谢
 
 感谢以下开源项目：
