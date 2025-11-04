@@ -116,7 +116,20 @@ sidebar:
 #####################
 
 comments:
-  service: # 可以选择 giscus, disqus, valine, waline 等
+  service: giscus
+  giscus:
+    repo: nash635/nash635.github.io
+    repo-id: R_kgDOKBdEtA
+    category: Announcements
+    category-id: DIC_kwDOKBdEtM4CxbhT
+    mapping: pathname
+    strict: 0
+    reactions-enabled: 1
+    emit-metadata: 1
+    input-position: top
+    theme: preferred_color_scheme
+    lang: zh-CN
+    loading: lazy
 
 #####################
 # 搜索功能
