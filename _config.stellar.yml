@@ -117,19 +117,13 @@ sidebar:
         title: 随机抽一篇文章吧
         content: |
           <a href="javascript:toRandomPost()">随机一篇</a>
-    - widget: markdown
-      config:
-        title: 分类索引
-        content: ""
     - widget: categories
       config:
+        title: 分类索引
         limit: 20
-    - widget: markdown
-      config:
-        title: 标签索引
-        content: ""
     - widget: tagcloud
       config:
+        title: 标签索引
         limit: 50
 
 #####################
