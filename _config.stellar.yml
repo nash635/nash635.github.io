@@ -90,11 +90,10 @@ sidebar:
         social:
           - icon: solar:github-bold
             url: https://github.com/nash635
-    - widget: markdown
+    - widget: recent_posts
       config:
         title: 最近更新
-        content: |
-          [查看更多](/archives/)
+        limit: 5
     - widget: navigation
       config:
         items:
@@ -117,18 +116,18 @@ sidebar:
       config:
         title: 随机抽一篇文章吧
         content: |
-          [随机一篇](javascript:toRandomPost())
+          <a href="javascript:toRandomPost()">随机一篇</a>
     - widget: markdown
       config:
         title: 分类索引
-        content: |
-          查看所有分类
+        content: ""
     - widget: categories
+      config:
+        limit: 20
     - widget: markdown
       config:
         title: 标签索引
-        content: |
-          查看所有标签
+        content: ""
     - widget: tagcloud
       config:
         limit: 50
