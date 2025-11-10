@@ -11,6 +11,29 @@ favicon: /img/favicon.png
 # 网站Logo
 logo:
   title: nash635's Blog
+  subtitle: 自强不息，厚德载物
+
+# 顶部导航栏
+navbar:
+  menu:
+    - name: 博客
+      icon: solar:notebook-bold-duotone
+      url: /
+    - name: 分类
+      icon: solar:folder-bold-duotone
+      url: /categories/
+    - name: 标签
+      icon: solar:tag-bold-duotone
+      url: /tags/
+    - name: 归档
+      icon: solar:calendar-bold-duotone
+      url: /archives/
+    - name: 友链
+      icon: solar:heart-bold-duotone
+      url: /friends/
+    - name: 关于
+      icon: solar:user-bold-duotone
+      url: /about/
 
 # 首页显示
 home:
