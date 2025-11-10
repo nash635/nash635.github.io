@@ -84,7 +84,7 @@ sidebar:
   widgets:
     - widget: author
       config:
-        avatar: /img/avatar.png
+        avatar: https://nash635.github.io/img/avatar.png
         name: nash635
         subtitle: 
         social:
