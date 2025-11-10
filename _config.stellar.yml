@@ -14,25 +14,23 @@ logo:
 
 # 首页显示
 home:
-  title: 欢迎来到我的博客
-  subtitle: 记录生活，分享技术
+  title: nash635的博客
+  subtitle: 自强不息，厚德载物
+  layout: list
 
 #####################
 # 导航菜单
 #####################
 
 menubar:
-  columns: 4
+  columns: 3
   items:
     - name: 博客
       icon: solar:notebook-bold-duotone
       url: /
-    - name: 标签
-      icon: solar:tag-bold-duotone  
-      url: /tags/
-    - name: 归档
-      icon: solar:calendar-bold-duotone
-      url: /archives/
+    - name: 友链
+      icon: solar:heart-bold-duotone
+      url: /friends/
     - name: 关于
       icon: solar:user-bold-duotone
       url: /about/
@@ -54,6 +52,63 @@ article:
 related_posts:
   enable: true
   max_count: 5
+
+#####################
+# 侧边栏配置
+#####################
+
+sidebar:
+  widgets:
+    - widget: author
+      config:
+        avatar: /img/avatar.png
+        name: nash635
+        subtitle: 
+        social:
+          - icon: solar:github-bold
+            url: https://github.com/nash635
+    - widget: markdown
+      config:
+        title: 最近更新
+        content: |
+          [查看更多](/archives/)
+    - widget: navigation
+      config:
+        items:
+          - name: 近期发布
+            icon: solar:clock-circle-bold-duotone
+            url: /
+          - name: 分类
+            icon: solar:folder-bold-duotone
+            url: /categories/
+          - name: 标签
+            icon: solar:tag-bold-duotone
+            url: /tags/
+          - name: 归档
+            icon: solar:calendar-bold-duotone
+            url: /archives/
+          - name: 留言板
+            icon: solar:chat-round-bold-duotone
+            url: /about/#comments
+    - widget: markdown
+      config:
+        title: 随机抽一篇文章吧
+        content: |
+          [随机一篇](javascript:toRandomPost())
+    - widget: markdown
+      config:
+        title: 分类索引
+        content: |
+          查看所有分类
+    - widget: categories
+    - widget: markdown
+      config:
+        title: 标签索引
+        content: |
+          查看所有标签
+    - widget: tagcloud
+      config:
+        limit: 50
 
 #####################
 # 评论系统
@@ -84,7 +139,8 @@ footer:
       url: mailto:your-email@example.com
 
   copyright: |
-    本站由 [Hexo](https://hexo.io) 强力驱动，使用 [Stellar](https://github.com/xaoxuu/hexo-theme-stellar) 主题
+    本站由 @nash635 使用 [Stellar](https://github.com/xaoxuu/hexo-theme-stellar) 主题创建。
+    本博客所有文章除特别声明外，均采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) 许可协议，转载请注明出处。
 
 #####################
 # 插件配置

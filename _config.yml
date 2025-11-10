@@ -65,8 +65,13 @@ index_generator:
   order_by: -date
 
 # Category & Tag
-default_category: uncategorized
+default_category: 其他
 category_map:
+  技术研究: tech-research
+  课程笔记: course-notes
+  读书笔记: reading-notes
+  随笔: essay
+  其他: other
 tag_map:
 
 # Metadata elements

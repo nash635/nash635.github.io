@@ -2,7 +2,7 @@
 title: Hello World
 date: 2025-07-24 01:18:25
 tags: [hello, world, stellar]
-categories: [生活]
+categories: [其他]
 description: 欢迎来到我的博客！这是使用 Hexo 和 Stellar 主题的第一篇文章。
 ---
 
