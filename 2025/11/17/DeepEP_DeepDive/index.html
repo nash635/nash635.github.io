@@ -1,0 +1,1290 @@
+
+<!DOCTYPE html><html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="hexo-theme" content="https://github.com/xaoxuu/hexo-theme-stellar/tree/1.33.1" theme-name="Stellar" theme-version="1.33.1">
+  
+  
+  <meta name="generator" content="Hexo 7.3.0">
+  <meta http-equiv='x-dns-prefetch-control' content='on' />
+  
+  <meta name="renderer" content="webkit">
+  <meta name="force-rendering" content="webkit">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+  <meta name="HandheldFriendly" content="True" >
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000">
+  <meta name="theme-color" content="#f9fafb">
+  <title>DeepEP 架构分析 - My Blog</title>
+
+  
+    <meta name="description" content="DeepEP是专为混合专家模型(MoE)和专家并行(EP)设计的高性能通信库，提供高吞吐量和低延迟的All-to-All GPU内核。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DeepEP 架构分析">
+<meta property="og:url" content="https://nash635.github.io/2025/11/17/DeepEP_DeepDive/">
+<meta property="og:site_name" content="My Blog">
+<meta property="og:description" content="DeepEP是专为混合专家模型(MoE)和专家并行(EP)设计的高性能通信库，提供高吞吐量和低延迟的All-to-All GPU内核。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-11-17T02:00:00.000Z">
+<meta property="article:modified_time" content="2025-11-17T14:42:49.955Z">
+<meta property="article:author" content="nash635">
+<meta property="article:tag" content="DeepEP">
+<meta property="article:tag" content="MoE">
+<meta property="article:tag" content="Expert Parallelism">
+<meta property="article:tag" content="通信库">
+<meta property="article:tag" content="All-to-All">
+<meta name="twitter:card" content="summary">
+  
+  
+  
+  <meta name="keywords" content="DeepEP,MoE,Expert Parallelism,通信库,All-to-All">
+
+  <!-- feed -->
+  
+
+  <link rel="stylesheet" href="/css/main.css?v=1.33.1">
+
+
+  
+
+  
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"nash635","sameAs":[]},"dateCreated":"2025-11-17T10:00:00+08:00","dateModified":"2025-11-17T22:42:49+08:00","datePublished":"2025-11-17T10:00:00+08:00","description":"","headline":"DeepEP 架构分析","mainEntityOfPage":{"@type":"WebPage","@id":"https://nash635.github.io/2025/11/17/DeepEP_DeepDive/"},"publisher":{"@type":"Organization","name":"nash635","sameAs":[]},"url":"https://nash635.github.io/2025/11/17/DeepEP_DeepDive/","keywords":"DeepEP, MoE, Expert Parallelism, 通信库, All-to-All","image":[]}</script>
+  
+</head>
+<body>
+
+<div class="l_body content" id="start" layout="post" type="tech" ><aside class="l_left"><div class="sidebg"></div><div class="leftbar-container">
+
+
+<header class="header"><div class="logo-wrap"><a class="avatar" href="/"><div class="bg" style="opacity:0;background-image:url(https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/avatar/round/rainbow64@3x.webp);"></div><img no-lazy class="avatar" src="/img/avatar.png" onerror="javascript:this.classList.add('error');this.src='https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/image/2659360.svg';"></a><a class="title" href="/"><div class="main">nash635's Blog</div><div class="sub cap">造车，造船，造飞机</div></a></div></header>
+
+<div class="nav-area">
+
+<nav class="menu dis-select"></nav>
+</div>
+<div class="widgets">
+<div class="search-wrapper" id="search-wrapper"><form class="search-form"><a class="search-button" onclick="document.getElementById(&quot;search-input&quot;).focus();"><svg t="1705074644177" viewBox="0 0 1025 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1560" width="200" height="200"><path d="M1008.839137 935.96571L792.364903 719.491476a56.783488 56.783488 0 0 0-80.152866 0 358.53545 358.53545 0 1 1 100.857314-335.166073 362.840335 362.840335 0 0 1-3.689902 170.145468 51.248635 51.248635 0 1 0 99.217358 26.444296 462.057693 462.057693 0 1 0-158.255785 242.303546l185.930047 185.725053a51.248635 51.248635 0 0 0 72.568068 0 51.248635 51.248635 0 0 0 0-72.978056z" p-id="1561"></path><path d="M616.479587 615.969233a50.428657 50.428657 0 0 0-61.498362-5.534852 174.655348 174.655348 0 0 1-177.525271 3.484907 49.403684 49.403684 0 0 0-58.833433 6.76482l-3.074918 2.869923a49.403684 49.403684 0 0 0 8.609771 78.10292 277.767601 277.767601 0 0 0 286.992355-5.739847 49.403684 49.403684 0 0 0 8.404776-76.667958z" p-id="1562"></path></svg></a><input type="text" class="search-input" id="search-input" placeholder="站内搜索"></form><div id="search-result"></div><div class="search-no-result">没有找到内容！</div></div>
+
+
+
+<widget class="widget-wrapper recent post-list"><div class="widget-header dis-select"><span class="name">最近更新</span></div><div class="widget-body fs14"><a class="item title" href="/2025/11/17/HCCL_DeepDive/"><span class="title">HCCL 集合通信库设计分析</span></a><a class="item title" href="/2025/11/17/DeepEP_DeepDive/"><span class="title">DeepEP 架构分析</span></a><a class="item title" href="/2025/11/17/Megatron_DeepDive/"><span class="title">Megatron-LM 架构深度分析</span></a><a class="item title" href="/2025/11/17/TransformerEngine_DeepDive/"><span class="title">Transformer Engine 架构设计分析</span></a><a class="item title" href="/2025/07/24/Hello-World/"><span class="title">Hello World</span></a></div></widget>
+</div>
+
+</div></aside><div class="l_main" id="main">
+
+
+
+
+
+<div class="article banner top">
+  <div class="content">
+    <div class="top bread-nav footnote"><div class="left"><div class="flex-row" id="breadcrumb"><a class="cap breadcrumb" href="/">主页</a>
+<span class="sep"></span><a class="cap breadcrumb" href="/">文章</a><span class="sep"></span><a class="cap breadcrumb-link" href="/categories/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E5%88%86%E6%9E%90/">系统架构分析</a></div>
+<div class="flex-row" id="post-meta"><span class="text created">发布于：<time datetime="2025-11-17T02:00:00.000Z">2025-11-17</time></span><span class="sep updated"></span><span class="text updated">更新于：<time datetime="2025-11-17T14:42:49.955Z">2025-11-17</time></span></div></div></div>
+    
+    <div class="bottom only-title">
+      
+      <div class="text-area">
+        <h1 class="text title"><span>DeepEP 架构分析</span></h1>
+        
+      </div>
+    </div>
+    
+  </div>
+  </div><article class="md-text content"><h1 id="DeepEP-架构分析文档"><a href="#DeepEP-架构分析文档" class="headerlink" title="DeepEP 架构分析文档"></a>DeepEP 架构分析文档</h1><h2 id="1-项目概述"><a href="#1-项目概述" class="headerlink" title="1. 项目概述"></a>1. 项目概述</h2><p><strong>DeepEP</strong> 是一个专为混合专家模型(Mixture-of-Experts, MoE)和专家并行(Expert Parallelism, EP)设计的高性能通信库。它提供了高吞吐量和低延迟的All-to-All GPU内核，专门优化了MoE模型中的dispatch和combine操作。</p>
+<p>该项目由DeepSeek团队开发，是支撑DeepSeek-V3大规模MoE训练和推理的核心基础设施。</p>
+<h3 id="核心特性"><a href="#核心特性" class="headerlink" title="核心特性"></a>核心特性</h3><ul>
+<li><strong>高吞吐量内核</strong>: 支持NVLink域到RDMA域的非对称带宽转发</li>
+<li><strong>低延迟内核</strong>: 主要使用RDMA通信，适用于推理解码任务（可配置是否使用NVLink加速）</li>
+<li><strong>多精度支持</strong>: 支持FP8、BF16等低精度操作</li>
+<li><strong>通信计算重叠</strong>: 基于hook的方法，不占用SM资源</li>
+<li><strong>可扩展性</strong>: 支持节点内(NVLink)和节点间(RDMA)通信</li>
+</ul>
+<h3 id="性能指标"><a href="#性能指标" class="headerlink" title="性能指标"></a>性能指标</h3><p><strong>节点内通信</strong> (H800, ~160 GB&#x2F;s NVLink):</p>
+<ul>
+<li>8个EP ranks: ~153-158 GB&#x2F;s</li>
+</ul>
+<p><strong>节点间通信</strong> (H800 + CX7 IB 400Gb&#x2F;s, ~50 GB&#x2F;s RDMA):</p>
+<ul>
+<li>16-64个EP ranks: ~43-58 GB&#x2F;s</li>
+</ul>
+<p><strong>低延迟模式</strong>:</p>
+<ul>
+<li>8 EP ranks: 77-114 us</li>
+<li>256 EP ranks: 194-360 us</li>
+</ul>
+<h3 id="依赖的关键技术"><a href="#依赖的关键技术" class="headerlink" title="依赖的关键技术"></a>依赖的关键技术</h3><p>DeepEP 构建在多个先进的GPU通信技术之上：</p>
+<h4 id="1-NVSHMEM-NVIDIA-Symmetric-Memory"><a href="#1-NVSHMEM-NVIDIA-Symmetric-Memory" class="headerlink" title="1. NVSHMEM (NVIDIA Symmetric Memory)"></a>1. <strong>NVSHMEM (NVIDIA Symmetric Memory)</strong></h4><p>NVSHMEM 是 NVIDIA 提供的分布式GPU内存访问库，实现了 OpenSHMEM 标准的 GPU 扩展。</p>
+<p><strong>核心能力</strong>:</p>
+<ul>
+<li><strong>对称内存模型</strong>: 所有GPU可以直接访问彼此的显存，无需CPU参与</li>
+<li><strong>单边通信</strong>: 支持 PUT&#x2F;GET 操作，发起方可以直接读写远端GPU内存</li>
+<li><strong>集合通信</strong>: 提供 barrier、broadcast、reduction 等原语</li>
+<li><strong>多传输支持</strong>: 同时支持 NVLink (节点内) 和 InfiniBand RDMA (节点间)</li>
+</ul>
+<p><strong>在DeepEP中的应用</strong>:</p>
+<ul>
+<li>节点间数据传输的底层实现</li>
+<li>低延迟模式的核心通信机制</li>
+<li>RDMA buffer 的对称内存管理</li>
+</ul>
+<h4 id="2-IBGDA-InfiniBand-GPU-Direct-Async"><a href="#2-IBGDA-InfiniBand-GPU-Direct-Async" class="headerlink" title="2. IBGDA (InfiniBand GPU Direct Async)"></a>2. <strong>IBGDA (InfiniBand GPU Direct Async)</strong></h4><p>IBGDA 是 NVIDIA 与 Mellanox 合作开发的技术，允许 GPU 直接发起 RDMA 操作。</p>
+<p><strong>核心能力</strong>:</p>
+<ul>
+<li><strong>零CPU开销</strong>: GPU 可以直接操作 InfiniBand HCA (Host Channel Adapter)</li>
+<li><strong>多QP并行</strong>: 支持每个GPU使用多个Queue Pair同时传输</li>
+<li><strong>低延迟</strong>: 绕过CPU，减少PCIe往返延迟</li>
+</ul>
+<p><strong>在DeepEP中的应用</strong>:</p>
+<ul>
+<li>节点间dispatch&#x2F;combine的高性能数据传输</li>
+<li>低延迟模式的快速RDMA操作</li>
+<li>多QP并行以提升带宽利用率</li>
+</ul>
+<h4 id="3-NVLink"><a href="#3-NVLink" class="headerlink" title="3. NVLink"></a>3. <strong>NVLink</strong></h4><p>NVIDIA 的高速GPU互联技术，提供节点内GPU之间的直接连接。</p>
+<p><strong>核心能力</strong>:</p>
+<ul>
+<li><strong>高带宽</strong>: H800单向带宽 ~160 GB&#x2F;s per GPU</li>
+<li><strong>低延迟</strong>: 比PCIe延迟低一个数量级</li>
+<li><strong>Peer-to-Peer</strong>: GPU之间可以直接访问彼此的显存</li>
+</ul>
+<p><strong>在DeepEP中的应用</strong>:</p>
+<ul>
+<li>节点内 dispatch&#x2F;combine 的主要传输路径</li>
+<li>节点间通信的本地聚合&#x2F;分发</li>
+<li>低延迟模式的可选加速路径</li>
+</ul>
+<h4 id="4-CUDA-IPC-Inter-Process-Communication"><a href="#4-CUDA-IPC-Inter-Process-Communication" class="headerlink" title="4. CUDA IPC (Inter-Process Communication)"></a>4. <strong>CUDA IPC (Inter-Process Communication)</strong></h4><p>CUDA提供的进程间共享GPU内存机制。</p>
+<p><strong>核心能力</strong>:</p>
+<ul>
+<li><strong>内存共享</strong>: 不同进程可以访问同一块GPU内存</li>
+<li><strong>零拷贝</strong>: 通过句柄 (handle) 映射，避免数据复制</li>
+</ul>
+<p><strong>在DeepEP中的应用</strong>:</p>
+<ul>
+<li>节点内多进程的buffer共享</li>
+<li>Barrier信号的共享内存实现</li>
+</ul>
+<h4 id="5-CUDA-Fabric-API-可选"><a href="#5-CUDA-Fabric-API-可选" class="headerlink" title="5. CUDA Fabric API (可选)"></a>5. <strong>CUDA Fabric API (可选)</strong></h4><p>新一代GPU内存管理API，支持更灵活的内存访问模式。</p>
+<p><strong>核心能力</strong>:</p>
+<ul>
+<li><strong>统一寻址</strong>: 提供跨GPU的统一虚拟地址空间</li>
+<li><strong>细粒度控制</strong>: 更好的内存访问权限管理</li>
+</ul>
+<p><strong>在DeepEP中的应用</strong>:</p>
+<ul>
+<li>作为CUDA IPC的替代方案</li>
+<li>支持更大规模的GPU集群</li>
+</ul>
+<h4 id="6-TMA-Tensor-Memory-Accelerator-SM90"><a href="#6-TMA-Tensor-Memory-Accelerator-SM90" class="headerlink" title="6. TMA (Tensor Memory Accelerator, SM90+)"></a>6. <strong>TMA (Tensor Memory Accelerator, SM90+)</strong></h4><p>Hopper架构引入的硬件加速内存拷贝单元。</p>
+<p><strong>核心能力</strong>:</p>
+<ul>
+<li><strong>硬件加速</strong>: 专用硬件单元处理张量拷贝</li>
+<li><strong>高带宽</strong>: 更高效地利用显存带宽</li>
+<li><strong>异步执行</strong>: 不占用SM计算资源</li>
+</ul>
+<p><strong>在DeepEP中的应用</strong>:</p>
+<ul>
+<li>H100&#x2F;H800上的向量化数据传输</li>
+<li>高吞吐dispatch&#x2F;combine优化</li>
+</ul>
+<hr>
+<h2 id="2-系统架构"><a href="#2-系统架构" class="headerlink" title="2. 系统架构"></a>2. 系统架构</h2><h3 id="2-1-整体架构图"><a href="#2-1-整体架构图" class="headerlink" title="2.1 整体架构图"></a>2.1 整体架构图</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph PythonAPI[&quot; Python API 层 &quot;]</span><br><span class="line">        Buffer[&quot;Buffer&quot;]</span><br><span class="line">        EventOverlap[&quot;EventOverlap&quot;]</span><br><span class="line">        Config[&quot;Config&quot;]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph CppRuntime[&quot; C++ Runtime 层 &quot;]</span><br><span class="line">        BufferMgmt[&quot;Buffer管理&quot;]</span><br><span class="line">        MemAlloc[&quot;内存分配&quot;]</span><br><span class="line">        ProcSync[&quot;进程同步&quot;]</span><br><span class="line">        EventMgmt[&quot;事件管理&quot;]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph CUDAKernel[&quot; CUDA Kernel 层 &quot;]</span><br><span class="line">        direction LR</span><br><span class="line">        Intranode[&quot;Intranode&lt;br/&gt;节点内通信&quot;]</span><br><span class="line">        Internode[&quot;Internode&lt;br/&gt;节点间通信&quot;]</span><br><span class="line">        LowLatency[&quot;Internode LL&lt;br/&gt;低延迟模式&quot;]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph Hardware[&quot; 硬件通信层 &quot;]</span><br><span class="line">        direction LR</span><br><span class="line">        NVLink[&quot;NVLink&quot;]</span><br><span class="line">        NVSHMEM[&quot;NVSHMEM&quot;]</span><br><span class="line">        IBGDA[&quot;IBGDA&quot;]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Buffer -.&quot;PyBind11&quot;.-&gt; BufferMgmt</span><br><span class="line">    EventOverlap -.&quot;PyBind11&quot;.-&gt; EventMgmt</span><br><span class="line">    Config -.&quot;PyBind11&quot;.-&gt; BufferMgmt</span><br><span class="line">    </span><br><span class="line">    BufferMgmt --&gt; Intranode</span><br><span class="line">    MemAlloc --&gt; Internode</span><br><span class="line">    ProcSync --&gt; LowLatency</span><br><span class="line">    EventMgmt --&gt; Intranode</span><br><span class="line">    </span><br><span class="line">    Intranode --&gt; NVLink</span><br><span class="line">    Internode --&gt; NVSHMEM</span><br><span class="line">    LowLatency --&gt; IBGDA</span><br><span class="line">    </span><br><span class="line">    style PythonAPI fill:#4fc3f7</span><br><span class="line">    style CppRuntime fill:#ffb74d</span><br><span class="line">    style CUDAKernel fill:#ba68c8</span><br><span class="line">    style Hardware fill:#81c784</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-2-数据流架构"><a href="#2-2-数据流架构" class="headerlink" title="2.2 数据流架构"></a>2.2 数据流架构</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    Start[&quot;输入张量 X&lt;br/&gt;[num_tokens, hidden]&quot;]</span><br><span class="line">    TopK[&quot;topk_idx&lt;br/&gt;[num_tokens, num_topk]&quot;]</span><br><span class="line">    </span><br><span class="line">    subgraph Layout[&quot; 1. Layout 计算 &quot;]</span><br><span class="line">        L1[&quot;计算 token→rank 映射&quot;]</span><br><span class="line">        L2[&quot;生成 prefix sum&quot;]</span><br><span class="line">        L3[&quot;统计 token 数量&quot;]</span><br><span class="line">        L1 --&gt; L2 --&gt; L3</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph Dispatch[&quot; 2. Dispatch 阶段 &quot;]</span><br><span class="line">        D0[&quot;All-to-All Scatter&quot;]</span><br><span class="line">        D1[&quot;传输 hidden data&quot;]</span><br><span class="line">        D2[&quot;传输 scales/metadata&quot;]</span><br><span class="line">        D3[&quot;传输 topk info&quot;]</span><br><span class="line">        D0 --&gt; D1 --&gt; D2 --&gt; D3</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph Expert[&quot; 3. Expert 计算 &quot;]</span><br><span class="line">        E1[&quot;各 rank 处理&lt;br/&gt;分配的 experts&quot;]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph Combine[&quot; 4. Combine 阶段 &quot;]</span><br><span class="line">        C1[&quot;All-to-All Gather&quot;]</span><br><span class="line">        C2[&quot;按 metadata 路由&quot;]</span><br><span class="line">        C3[&quot;应用 topk_weights&quot;]</span><br><span class="line">        C4[&quot;可选 bias 加法&quot;]</span><br><span class="line">        C1 --&gt; C2 --&gt; C3 --&gt; C4</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    End[&quot;输出张量 Y&lt;br/&gt;[num_tokens, hidden]&quot;]</span><br><span class="line">    </span><br><span class="line">    Start --&gt; Layout</span><br><span class="line">    TopK --&gt; Layout</span><br><span class="line">    Layout --&gt; Dispatch</span><br><span class="line">    Dispatch --&gt; Expert</span><br><span class="line">    Expert --&gt; Combine</span><br><span class="line">    Combine --&gt; End</span><br><span class="line">    </span><br><span class="line">    style Start fill:#4fc3f7</span><br><span class="line">    style TopK fill:#4fc3f7</span><br><span class="line">    style Layout fill:#ffb74d</span><br><span class="line">    style Dispatch fill:#ba68c8</span><br><span class="line">    style Expert fill:#81c784</span><br><span class="line">    style Combine fill:#f06292</span><br><span class="line">    style End fill:#4fc3f7</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="3-核心模块详解"><a href="#3-核心模块详解" class="headerlink" title="3. 核心模块详解"></a>3. 核心模块详解</h2><h3 id="3-1-Buffer-管理模块"><a href="#3-1-Buffer-管理模块" class="headerlink" title="3.1 Buffer 管理模块"></a>3.1 Buffer 管理模块</h3><p><strong>位置</strong>: <code>deep_ep/buffer.py</code> + <code>csrc/deep_ep.hpp/cpp</code></p>
+<h4 id="核心职责"><a href="#核心职责" class="headerlink" title="核心职责"></a>核心职责</h4><ol>
+<li><p><strong>内存管理</strong></p>
+<ul>
+<li>NVLink Buffer: 节点内通信缓冲区</li>
+<li>RDMA Buffer: 节点间通信缓冲区 (通过NVSHMEM)</li>
+<li>支持 Fabric API (GPU Direct Storage)</li>
+</ul>
+</li>
+<li><p><strong>进程同步</strong></p>
+<ul>
+<li>IPC Handle 同步 (CUDA IPC &#x2F; Fabric)</li>
+<li>NVSHMEM 初始化和 Unique ID 交换</li>
+<li>Barrier 机制</li>
+</ul>
+</li>
+<li><p><strong>通信流管理</strong></p>
+<ul>
+<li>独立的 communication stream</li>
+<li>事件同步机制</li>
+<li>计算通信重叠支持</li>
+</ul>
+</li>
+</ol>
+<h4 id="关键数据结构"><a href="#关键数据结构" class="headerlink" title="关键数据结构"></a>关键数据结构</h4><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Buffer</span> &#123;</span><br><span class="line">    <span class="comment">// 缓冲区指针</span></span><br><span class="line">    <span class="type">void</span>* buffer_ptrs[NUM_MAX_NVL_PEERS];     <span class="comment">// NVLink buffers</span></span><br><span class="line">    <span class="type">void</span>* rdma_buffer_ptr;                     <span class="comment">// NVSHMEM buffer</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 同步信号</span></span><br><span class="line">    <span class="type">int</span>* barrier_signal_ptrs[NUM_MAX_NVL_PEERS];</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 接收计数器 (CPU-GPU 通信)</span></span><br><span class="line">    <span class="keyword">volatile</span> <span class="type">int</span>* moe_recv_counter;</span><br><span class="line">    <span class="keyword">volatile</span> <span class="type">int</span>* moe_recv_expert_counter;</span><br><span class="line">    <span class="keyword">volatile</span> <span class="type">int</span>* moe_recv_rdma_counter;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 拓扑信息</span></span><br><span class="line">    <span class="type">int</span> rank, rdma_rank, nvl_rank;</span><br><span class="line">    <span class="type">int</span> num_ranks, num_rdma_ranks, num_nvl_ranks;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 低延迟模式特定</span></span><br><span class="line">    <span class="type">bool</span> low_latency_mode;</span><br><span class="line">    <span class="type">int</span> low_latency_buffer_idx;  <span class="comment">// 双缓冲</span></span><br><span class="line">    <span class="type">int</span>* mask_buffer_ptr;         <span class="comment">// 动态 rank 屏蔽</span></span><br><span class="line">    <span class="type">int</span>* sync_buffer_ptr;         <span class="comment">// 自定义 barrier</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h4 id="初始化流程"><a href="#初始化流程" class="headerlink" title="初始化流程"></a>初始化流程</h4><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 创建 Buffer 对象</span></span><br><span class="line">buffer = deep_ep.Buffer(</span><br><span class="line">    group=dist_group,</span><br><span class="line">    num_nvl_bytes=nvl_size,</span><br><span class="line">    num_rdma_bytes=rdma_size,</span><br><span class="line">    low_latency_mode=<span class="literal">False</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 自动执行同步</span></span><br><span class="line"><span class="comment"># - 交换 device IDs</span></span><br><span class="line"><span class="comment"># - 交换 IPC handles</span></span><br><span class="line"><span class="comment"># - 初始化 NVSHMEM (如果需要)</span></span><br><span class="line"><span class="comment"># - 设置 IBGDA QP 数量</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. Buffer 可用</span></span><br><span class="line"><span class="keyword">assert</span> buffer.runtime.is_available()</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h3 id="3-2-Intranode-Kernels-节点内通信"><a href="#3-2-Intranode-Kernels-节点内通信" class="headerlink" title="3.2 Intranode Kernels (节点内通信)"></a>3.2 Intranode Kernels (节点内通信)</h3><p><strong>位置</strong>: <code>csrc/kernels/intranode.cu</code></p>
+<h4 id="核心原理"><a href="#核心原理" class="headerlink" title="核心原理"></a>核心原理</h4><p><strong>通信模式</strong>: NVLink peer-to-peer 直接内存访问</p>
+<p><strong>Dispatch 流程</strong>:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph Phase1[&quot; 阶段1: notify_dispatch &quot;]</span><br><span class="line">        direction TB</span><br><span class="line">        SM0[&quot;SM 0: 同步和元数据&quot;]</span><br><span class="line">        SM0_1[&quot;执行 barrier&quot;]</span><br><span class="line">        SM0_2[&quot;统计 tokens&quot;]</span><br><span class="line">        SM0_3[&quot;计算 prefix sum&quot;]</span><br><span class="line">        </span><br><span class="line">        SMN[&quot;SM 1-N: channel 分布&quot;]</span><br><span class="line">        SMN_1[&quot;处理目标 rank&quot;]</span><br><span class="line">        SMN_2[&quot;计算 prefix matrix&quot;]</span><br><span class="line">        </span><br><span class="line">        SM0 --&gt; SM0_1 --&gt; SM0_2 --&gt; SM0_3</span><br><span class="line">        SMN --&gt; SMN_1 --&gt; SMN_2</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph Phase2[&quot; 阶段2: dispatch 数据传输 &quot;]</span><br><span class="line">        direction TB</span><br><span class="line">        D1[&quot;每个 SM 负责一个 rank&quot;]</span><br><span class="line">        D2[&quot;channel 划分负载&quot;]</span><br><span class="line">        D3[&quot;NVLink 写入对端&quot;]</span><br><span class="line">        D4[&quot;在线类型转换&quot;]</span><br><span class="line">        </span><br><span class="line">        D1 --&gt; D2 --&gt; D3 --&gt; D4</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Phase1 ==&gt; Phase2</span><br><span class="line">    </span><br><span class="line">    style Phase1 fill:#4fc3f7</span><br><span class="line">    style Phase2 fill:#ba68c8</span><br></pre></td></tr></table></figure>
+
+<h4 id="关键优化技术"><a href="#关键优化技术" class="headerlink" title="关键优化技术"></a>关键优化技术</h4><ol>
+<li><p><strong>Channel 并行</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">// 将 tokens 分成多个 channel，每个 channel 独立处理</span><br><span class="line">int token_start_idx, token_end_idx;</span><br><span class="line">get_channel_task_range(num_tokens, num_channels, </span><br><span class="line">                       channel_id, token_start_idx, token_end_idx);</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>Barrier 优化</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">template &lt;int kNumRanks, bool init&gt;</span><br><span class="line">__device__ void barrier_block(int** barrier_signal_ptrs, int rank) &#123;</span><br><span class="line">    // 使用 GPU 内存的原子操作实现快速 barrier</span><br><span class="line">    // 避免 CPU 参与</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>对齐和向量化</strong></p>
+<ul>
+<li>数据对齐到 128 bytes</li>
+<li>使用 int4 向量加载&#x2F;存储</li>
+<li>TMA (Tensor Memory Accelerator) 支持 (SM90+)</li>
+</ul>
+</li>
+</ol>
+<h4 id="Combine-流程"><a href="#Combine-流程" class="headerlink" title="Combine 流程"></a>Combine 流程</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">1. 从多个源 rank 收集数据</span><br><span class="line">2. 按照 src_idx 排序重组</span><br><span class="line">3. 应用 topk_weights 加权</span><br><span class="line">4. 累加到输出张量 (使用 atomicAdd)</span><br><span class="line">5. 可选添加 bias</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h3 id="3-3-Internode-Kernels-节点间通信"><a href="#3-3-Internode-Kernels-节点间通信" class="headerlink" title="3.3 Internode Kernels (节点间通信)"></a>3.3 Internode Kernels (节点间通信)</h3><p><strong>位置</strong>: <code>csrc/kernels/internode.cu</code></p>
+<h4 id="核心原理-1"><a href="#核心原理-1" class="headerlink" title="核心原理"></a>核心原理</h4><p><strong>通信模式</strong>: NVSHMEM + NVLink 混合</p>
+<ul>
+<li><strong>RDMA 通信</strong>: 跨节点数据传输</li>
+<li><strong>NVLink 通信</strong>: 节点内聚合&#x2F;分发</li>
+</ul>
+<h4 id="拓扑结构"><a href="#拓扑结构" class="headerlink" title="拓扑结构"></a>拓扑结构</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph RDMA0[&quot; RDMA Rank 0 (节点0) &quot;]</span><br><span class="line">        direction LR</span><br><span class="line">        N00[&quot;GPU0&quot;]</span><br><span class="line">        N01[&quot;GPU1&quot;]</span><br><span class="line">        N02[&quot;GPU2&quot;]</span><br><span class="line">        N0X[&quot;...&quot;]  </span><br><span class="line">        N07[&quot;GPU7&quot;]</span><br><span class="line">        </span><br><span class="line">        N00 -.&quot;NVLink&quot;.-&gt; N01 -.&quot;NVLink&quot;.-&gt; N02 -.&quot;NVLink&quot;.-&gt; N0X -.&quot;NVLink&quot;.-&gt; N07</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph RDMA1[&quot; RDMA Rank 1 (节点1) &quot;]</span><br><span class="line">        direction LR</span><br><span class="line">        N10[&quot;GPU0&quot;]</span><br><span class="line">        N11[&quot;GPU1&quot;]</span><br><span class="line">        N12[&quot;GPU2&quot;]</span><br><span class="line">        N1X[&quot;...&quot;]</span><br><span class="line">        N17[&quot;GPU7&quot;]</span><br><span class="line">        </span><br><span class="line">        N10 -.&quot;NVLink&quot;.-&gt; N11 -.&quot;NVLink&quot;.-&gt; N12 -.&quot;NVLink&quot;.-&gt; N1X -.&quot;NVLink&quot;.-&gt; N17</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    RDMA0 &lt;==&quot; RDMA IB &quot;===&gt; RDMA1</span><br><span class="line">    </span><br><span class="line">    style RDMA0 fill:#4fc3f7</span><br><span class="line">    style RDMA1 fill:#ffb74d</span><br></pre></td></tr></table></figure>
+
+<h4 id="Dispatch-流程"><a href="#Dispatch-流程" class="headerlink" title="Dispatch 流程"></a>Dispatch 流程</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph Stage1[&quot; 阶段1: RDMA 元数据交换 &quot;]</span><br><span class="line">        S1_1[&quot;收集本地 GPU 统计&quot;]</span><br><span class="line">        S1_2[&quot;NVSHMEM PUT 广播&quot;]</span><br><span class="line">        S1_3[&quot;同步等待&quot;]</span><br><span class="line">        S1_1 --&gt; S1_2 --&gt; S1_3</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph Stage2[&quot; 阶段2: RDMA 数据传输 &quot;]</span><br><span class="line">        S2_1[&quot;读取 NVLink buffer&quot;]</span><br><span class="line">        S2_2[&quot;FP8 量化(可选)&quot;]</span><br><span class="line">        S2_3[&quot;NVSHMEM PUT 远端&quot;]</span><br><span class="line">        S2_4[&quot;IBGDA 多 QP 加速&quot;]</span><br><span class="line">        S2_1 --&gt; S2_2 --&gt; S2_3 --&gt; S2_4</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph Stage3[&quot; 阶段3: NVLink 本地分发 &quot;]</span><br><span class="line">        S3_1[&quot;读取 RDMA buffer&quot;]</span><br><span class="line">        S3_2[&quot;分发到本地 ranks&quot;]</span><br><span class="line">        S3_3[&quot;写入接收 buffer&quot;]</span><br><span class="line">        S3_1 --&gt; S3_2 --&gt; S3_3</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Stage1 ==&gt; Stage2</span><br><span class="line">    Stage2 ==&gt; Stage3</span><br><span class="line">    </span><br><span class="line">    style Stage1 fill:#81c784</span><br><span class="line">    style Stage2 fill:#ffb74d</span><br><span class="line">    style Stage3 fill:#ba68c8</span><br></pre></td></tr></table></figure>
+
+<h4 id="SourceMeta-编码"><a href="#SourceMeta-编码" class="headerlink" title="SourceMeta 编码"></a>SourceMeta 编码</h4><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">SourceMeta</span> &#123;</span><br><span class="line">    <span class="type">int</span> src_rdma_rank;                  <span class="comment">// 源 RDMA rank</span></span><br><span class="line">    <span class="type">int</span> is_token_in_nvl_rank_bits;      <span class="comment">// 8-bit mask for 8 NVL ranks</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 编码示例: token 来自 RDMA rank 2 的 GPU 0, 3, 5</span></span><br><span class="line">    <span class="comment">// src_rdma_rank = 2</span></span><br><span class="line">    <span class="comment">// is_token_in_nvl_rank_bits = 0b00101001</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这个元数据在 combine 阶段用于路由数据返回正确的 GPU。</p>
+<h4 id="关键优化"><a href="#关键优化" class="headerlink" title="关键优化"></a>关键优化</h4><ol>
+<li><p><strong>IBGDA (InfiniBand GPU Direct Async)</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">nvshmemi_ibgda_put_nbi_warp&lt;true&gt;(</span><br><span class="line">    dst_addr, src_addr, size, dst_rank, qp_id, lane_id, 0</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+<ul>
+<li>直接从 GPU 发起 RDMA 操作</li>
+<li>多 QP 并行传输</li>
+<li>Warp 级别的协作</li>
+</ul>
+</li>
+<li><p><strong>双层 Buffer</strong></p>
+<ul>
+<li>RDMA buffer: 节点间数据缓冲</li>
+<li>NVLink buffer: 节点内数据分发</li>
+</ul>
+</li>
+<li><p><strong>动态 Channel 分配</strong></p>
+<ul>
+<li>根据负载动态分配 channel</li>
+<li>平衡 NVLink 和 RDMA 带宽</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="3-4-Low-Latency-Kernels-低延迟内核"><a href="#3-4-Low-Latency-Kernels-低延迟内核" class="headerlink" title="3.4 Low-Latency Kernels (低延迟内核)"></a>3.4 Low-Latency Kernels (低延迟内核)</h3><p><strong>位置</strong>: <code>csrc/kernels/internode_ll.cu</code></p>
+<h4 id="设计目标"><a href="#设计目标" class="headerlink" title="设计目标"></a>设计目标</h4><p>专为<strong>推理解码</strong>场景优化:</p>
+<ul>
+<li>小 batch size (通常 128-512 tokens)</li>
+<li>极低延迟要求 (&lt; 200 us)</li>
+<li>主要使用 RDMA 通信，在允许的配置下也会利用 NVLink 加速</li>
+<li>支持通过环境变量 <code>NVSHMEM_DISABLE_P2P</code> 控制是否使用 NVLink</li>
+<li>主要使用 RDMA 通信，在允许的配置下也会利用 NVLink 加速</li>
+<li>支持通过环境变量 <code>NVSHMEM_DISABLE_P2P</code> 控制是否使用 NVLink</li>
+</ul>
+<h4 id="核心特性-1"><a href="#核心特性-1" class="headerlink" title="核心特性"></a>核心特性</h4><ol>
+<li><p><strong>双缓冲机制</strong></p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> low_latency_buffer_idx;  <span class="comment">// 0 or 1</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// dispatch 使用 buffer 0，combine 使用 buffer 1</span></span><br><span class="line"><span class="comment">// 下一次迭代切换</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>Hook-based 通信计算重叠</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># dispatch 返回 recv_hook</span></span><br><span class="line">recv_x, handle, event, recv_hook = buffer.low_latency_dispatch(...)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 在 expert 计算前调用 hook</span></span><br><span class="line"><span class="keyword">if</span> recv_hook:</span><br><span class="line">    recv_hook()  <span class="comment"># 轮询 RDMA 接收完成</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># expert 计算</span></span><br><span class="line">output = expert_forward(recv_x)</span><br><span class="line"></span><br><span class="line"><span class="comment"># combine (同样有 hook)</span></span><br><span class="line">result, event, recv_hook = buffer.low_latency_combine(...)</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>动态 Rank 屏蔽</strong></p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 用于容错: 如果某个 rank 超时，动态屏蔽它</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">low_latency_update_mask_buffer</span><span class="params">(<span class="type">int</span> rank_to_mask, <span class="type">bool</span> mask)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// barrier 实现会跳过被屏蔽的 rank</span></span><br><span class="line"><span class="keyword">if</span> (<span class="built_in">is_rank_masked</span>(mask_buffer_ptr, dst_rank)) &#123;</span><br><span class="line">    <span class="keyword">continue</span>;  <span class="comment">// 跳过这个 rank</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h4 id="Dispatch-流程-1"><a href="#Dispatch-流程-1" class="headerlink" title="Dispatch 流程"></a>Dispatch 流程</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    subgraph SendPhase[&quot; 发送阶段 LOW_LATENCY_SEND &quot;]</span><br><span class="line">        direction TB</span><br><span class="line">        Send1[&quot;读取 topk_idx&quot;]</span><br><span class="line">        Send2[&quot;按 expert 分组&quot;]</span><br><span class="line">        Send3[&quot;FP8 量化(可选)&quot;]</span><br><span class="line">        Send4[&quot;RDMA PUT 固定 buffer&quot;]</span><br><span class="line">        Send5[&quot;更新 atomic counter&quot;]</span><br><span class="line">        </span><br><span class="line">        Send1 --&gt; Send2 --&gt; Send3 --&gt; Send4 --&gt; Send5</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph RecvPhase[&quot; 接收阶段 LOW_LATENCY_RECV &quot;]</span><br><span class="line">        direction TB</span><br><span class="line">        Recv1[&quot;轮询 atomic counter&quot;]</span><br><span class="line">        Recv2[&quot;等待预期值&quot;]</span><br><span class="line">        Recv3[&quot;收集统计(可选)&quot;]</span><br><span class="line">        </span><br><span class="line">        Recv1 --&gt; Recv2 --&gt; Recv3</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    SendPhase ==&gt; RecvPhase</span><br><span class="line">    </span><br><span class="line">    style SendPhase fill:#4fc3f7</span><br><span class="line">    style RecvPhase fill:#81c784</span><br></pre></td></tr></table></figure>
+
+<h4 id="Combine-流程-1"><a href="#Combine-流程-1" class="headerlink" title="Combine 流程"></a>Combine 流程</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">类似 dispatch，但数据流反向:</span><br><span class="line">1. Expert 输出写入 RDMA buffer</span><br><span class="line">2. 根据 src_info 路由回源 token</span><br><span class="line">3. 应用 topk_weights</span><br><span class="line">4. 可选零拷贝模式 (直接写入输出张量)</span><br></pre></td></tr></table></figure>
+
+<h4 id="关键优化-1"><a href="#关键优化-1" class="headerlink" title="关键优化"></a>关键优化</h4><ol>
+<li><p><strong>预分配固定大小 Buffer</strong></p>
+<ul>
+<li>每个 rank 为每个 expert 预分配固定空间</li>
+<li>避免动态内存分配和复杂的地址计算</li>
+</ul>
+</li>
+<li><p><strong>Warp-Group 并行</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">// 每个 expert 由一个 warp-group (多个 warp) 处理</span><br><span class="line">const auto warp_group_id = warp_id / num_warps_per_group;</span><br><span class="line">const auto responsible_expert_idx = sm_id * num_warp_groups + warp_group_id;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>轮询 vs 中断</strong></p>
+<ul>
+<li>使用主动轮询 (polling) 而非中断</li>
+<li>更低的延迟，代价是持续占用 CPU&#x2F;GPU</li>
+</ul>
+</li>
+<li><p><strong>超时和容错</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">auto start_time = clock64();</span><br><span class="line">uint64_t wait_recv_cost = 0;</span><br><span class="line">while (condition &amp;&amp; </span><br><span class="line">       (wait_recv_cost = clock64() - start_time) &lt;= NUM_TIMEOUT_CYCLES) &#123;</span><br><span class="line">    // polling</span><br><span class="line">&#125;</span><br><span class="line">if (wait_recv_cost &gt; NUM_TIMEOUT_CYCLES) &#123;</span><br><span class="line">    // 超时处理: 屏蔽该 rank</span><br><span class="line">    atomicExch(mask_buffer_ptr + dst_rank, 1);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<hr>
+<h3 id="3-5-Layout-计算模块"><a href="#3-5-Layout-计算模块" class="headerlink" title="3.5 Layout 计算模块"></a>3.5 Layout 计算模块</h3><p><strong>位置</strong>: <code>csrc/kernels/layout.cu</code></p>
+<h4 id="核心功能"><a href="#核心功能" class="headerlink" title="核心功能"></a>核心功能</h4><p>在 dispatch 之前计算路由信息:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">num_tokens_per_rank,      <span class="comment"># [num_ranks] 每个 rank 接收的 token 数</span></span><br><span class="line">num_tokens_per_rdma_rank, <span class="comment"># [num_rdma_ranks] 每个 RDMA rank 接收数</span></span><br><span class="line">num_tokens_per_expert,    <span class="comment"># [num_experts] 每个 expert 接收数</span></span><br><span class="line">is_token_in_rank,         <span class="comment"># [num_tokens, num_ranks] bool 矩阵</span></span><br><span class="line">layout_event              <span class="comment"># CUDA event</span></span><br><span class="line">= buffer.get_dispatch_layout(topk_idx, num_experts)</span><br></pre></td></tr></table></figure>
+
+<h4 id="算法流程"><a href="#算法流程" class="headerlink" title="算法流程"></a>算法流程</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">flowchart TB</span><br><span class="line">    Input[&quot;输入: topk_idx&lt;br/&gt;[num_tokens, num_topk]&quot;]</span><br><span class="line">    </span><br><span class="line">    subgraph Step1[&quot; 步骤1: 扫描 top-k experts &quot;]</span><br><span class="line">        direction TB</span><br><span class="line">        S1_1[&quot;遍历所有 tokens&quot;]</span><br><span class="line">        S1_2[&quot;获取 expert_id&quot;]</span><br><span class="line">        S1_3[&quot;计算目标 rank&quot;]</span><br><span class="line">        S1_4[&quot;标记 is_token_in_rank&quot;]</span><br><span class="line">        S1_1 --&gt; S1_2 --&gt; S1_3 --&gt; S1_4</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph Step2[&quot; 步骤2: 统计 token 数量 &quot;]</span><br><span class="line">        direction TB</span><br><span class="line">        S2_1[&quot;sum per rank&quot;]</span><br><span class="line">        S2_2[&quot;count per expert&quot;]</span><br><span class="line">        S2_1 --&gt; S2_2</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph Step3[&quot; 步骤3: 对齐处理 &quot;]</span><br><span class="line">        S3_1[&quot;align_up to&lt;br/&gt;expert_alignment&quot;]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Input --&gt; Step1</span><br><span class="line">    Step1 --&gt; Step2</span><br><span class="line">    Step2 --&gt; Step3</span><br><span class="line">    </span><br><span class="line">    style Input fill:#4fc3f7</span><br><span class="line">    style Step1 fill:#ffb74d</span><br><span class="line">    style Step2 fill:#ba68c8</span><br><span class="line">    style Step3 fill:#81c784</span><br></pre></td></tr></table></figure>
+
+<h4 id="优化技术"><a href="#优化技术" class="headerlink" title="优化技术"></a>优化技术</h4><ul>
+<li>Warp-level reduction</li>
+<li>Shared memory 聚合</li>
+<li>Coalesced memory access</li>
+</ul>
+<hr>
+<h3 id="3-6-事件和同步机制"><a href="#3-6-事件和同步机制" class="headerlink" title="3.6 事件和同步机制"></a>3.6 事件和同步机制</h3><p><strong>位置</strong>: <code>csrc/event.hpp</code> + <code>deep_ep/utils.py</code></p>
+<h4 id="EventOverlap-类"><a href="#EventOverlap-类" class="headerlink" title="EventOverlap 类"></a>EventOverlap 类</h4><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">EventOverlap</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;通信计算重叠的便利封装&quot;&quot;&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, event: EventHandle</span>):</span><br><span class="line">        <span class="variable language_">self</span>.event = event</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">current_stream_wait</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="string">&quot;&quot;&quot;当前流等待事件完成&quot;&quot;&quot;</span></span><br><span class="line">        <span class="variable language_">self</span>.event.current_stream_wait()</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 支持 with 语法</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__enter__</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="keyword">return</span> <span class="variable language_">self</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__exit__</span>(<span class="params">self, ...</span>):</span><br><span class="line">        <span class="keyword">if</span> <span class="variable language_">self</span>.event <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">            <span class="variable language_">self</span>.event.current_stream_wait()</span><br></pre></td></tr></table></figure>
+
+<h4 id="使用模式"><a href="#使用模式" class="headerlink" title="使用模式"></a>使用模式</h4><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 模式 1: 手动同步</span></span><br><span class="line">event = buffer.dispatch(...)</span><br><span class="line"><span class="comment"># ... 其他计算 ...</span></span><br><span class="line">event.current_stream_wait()  <span class="comment"># 等待 dispatch 完成</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 模式 2: with 语法</span></span><br><span class="line">event = buffer.dispatch(...)</span><br><span class="line"><span class="keyword">with</span> event:</span><br><span class="line">    <span class="comment"># 这里的计算与 dispatch 重叠</span></span><br><span class="line">    expert_computation()</span><br><span class="line"><span class="comment"># 退出 with 时自动等待</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 模式 3: async 模式</span></span><br><span class="line">event = buffer.dispatch(..., async_mode=<span class="literal">True</span>)</span><br><span class="line"><span class="comment"># dispatch 在独立 stream 上执行</span></span><br><span class="line"><span class="comment"># 主流继续运行</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="4-关键技术细节"><a href="#4-关键技术细节" class="headerlink" title="4. 关键技术细节"></a>4. 关键技术细节</h2><h3 id="4-1-FP8-量化"><a href="#4-1-FP8-量化" class="headerlink" title="4.1 FP8 量化"></a>4.1 FP8 量化</h3><p>DeepEP 支持两种 FP8 格式:</p>
+<ul>
+<li><strong>E4M3</strong>: 常规 FP8 (4-bit exponent, 3-bit mantissa)</li>
+<li><strong>UE8M0</strong>: 特殊格式 (无符号 8-bit 整数作为 scale)</li>
+</ul>
+<h4 id="Per-Token-量化"><a href="#Per-Token-量化" class="headerlink" title="Per-Token 量化"></a>Per-Token 量化</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">// dispatch 时量化</span><br><span class="line">scale = max(abs(token)) / 448.0  // E4M3 max</span><br><span class="line">quantized_token = token / scale</span><br><span class="line"></span><br><span class="line">// combine 时反量化</span><br><span class="line">dequantized_token = quantized_token * scale</span><br></pre></td></tr></table></figure>
+
+<h4 id="Scale-存储优化"><a href="#Scale-存储优化" class="headerlink" title="Scale 存储优化"></a>Scale 存储优化</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">// 每 128 个元素一个 scale (channel-wise)</span><br><span class="line">constexpr int kNumPerChannels = 128;</span><br><span class="line">int num_scales = hidden / kNumPerChannels;</span><br><span class="line"></span><br><span class="line">// UE8M0: 将 float scale 编码为 uint8</span><br><span class="line">uint8_t encode_ue8m0(float scale);</span><br><span class="line">float decode_ue8m0(uint8_t encoded_scale);</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-IBGDA-InfiniBand-GPU-Direct-Async"><a href="#4-2-IBGDA-InfiniBand-GPU-Direct-Async" class="headerlink" title="4.2 IBGDA (InfiniBand GPU Direct Async)"></a>4.2 IBGDA (InfiniBand GPU Direct Async)</h3><h4 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h4><p>IBGDA 允许 GPU 直接发起 RDMA 操作，无需 CPU 参与:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">传统 NVSHMEM:</span><br><span class="line">GPU → PCIe → CPU → IB HCA → Network</span><br><span class="line">                ↓</span><br><span class="line">           RDMA 操作排队</span><br><span class="line"></span><br><span class="line">IBGDA:</span><br><span class="line">GPU → Direct Access to IB HCA → Network</span><br><span class="line">      (通过 BAR 映射)</span><br></pre></td></tr></table></figure>
+
+<h4 id="多-QP-并行"><a href="#多-QP-并行" class="headerlink" title="多 QP 并行"></a>多 QP 并行</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">// 配置多个 Queue Pair (QP) 用于并行传输</span><br><span class="line">int qps_per_rank = num_rc_per_pe * num_devices_initialized;</span><br><span class="line"></span><br><span class="line">// 并行发起多个 QP 上的传输</span><br><span class="line">for (int qp_id = 0; qp_id &lt; qps_per_rank; qp_id++) &#123;</span><br><span class="line">    nvshmemi_ibgda_put_nbi_warp(</span><br><span class="line">        dst_addr, src_addr, size, dst_rank, qp_id, ...</span><br><span class="line">    );</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// Quiet: 确保所有操作完成</span><br><span class="line">nvshmemi_ibgda_quiet(dst_rank, qp_id);</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-3-Barrier-实现"><a href="#4-3-Barrier-实现" class="headerlink" title="4.3 Barrier 实现"></a>4.3 Barrier 实现</h3><h4 id="GPU-only-Barrier"><a href="#GPU-only-Barrier" class="headerlink" title="GPU-only Barrier"></a>GPU-only Barrier</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">template &lt;int kNumRanks, bool init = false&gt;</span><br><span class="line">__device__ void barrier_block(int** barrier_signal_ptrs, int rank) &#123;</span><br><span class="line">    __shared__ int barrier_signals[kNumRanks];</span><br><span class="line">    </span><br><span class="line">    if (init) &#123;</span><br><span class="line">        // 初始化: 每个 rank 重置自己的信号</span><br><span class="line">        if (threadIdx.x == 0) &#123;</span><br><span class="line">            for (int i = 0; i &lt; kNumRanks; i++) &#123;</span><br><span class="line">                barrier_signals[i] = 0;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    // Phase 1: 通知其他 ranks</span><br><span class="line">    if (threadIdx.x &lt; kNumRanks &amp;&amp; threadIdx.x != rank) &#123;</span><br><span class="line">        atomicAdd(barrier_signal_ptrs[threadIdx.x] + rank, 1);</span><br><span class="line">    &#125;</span><br><span class="line">    __syncthreads();</span><br><span class="line">    </span><br><span class="line">    // Phase 2: 等待其他 ranks 通知</span><br><span class="line">    if (threadIdx.x == 0) &#123;</span><br><span class="line">        for (int i = 0; i &lt; kNumRanks; i++) &#123;</span><br><span class="line">            if (i != rank) &#123;</span><br><span class="line">                while (barrier_signal_ptrs[rank][i] &lt; expected_count) &#123;</span><br><span class="line">                    // spin wait</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    __syncthreads();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-4-内存访问优化"><a href="#4-4-内存访问优化" class="headerlink" title="4.4 内存访问优化"></a>4.4 内存访问优化</h3><h4 id="Load-Store-指令选择"><a href="#Load-Store-指令选择" class="headerlink" title="Load&#x2F;Store 指令选择"></a>Load&#x2F;Store 指令选择</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">// Global memory with cache control</span><br><span class="line">template &lt;typename T&gt;</span><br><span class="line">__device__ T ld_volatile_global(const T* addr) &#123;</span><br><span class="line">    return *((volatile T*)addr);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">template &lt;typename T&gt;</span><br><span class="line">__device__ void st_na_global(T* addr, T val) &#123;</span><br><span class="line">    // Non-allocating store (不污染 L2 cache)</span><br><span class="line">    #ifndef DISABLE_AGGRESSIVE_PTX_INSTRS</span><br><span class="line">    asm volatile(&quot;st.global.cs.L2::no_allocate %0, %1;&quot; </span><br><span class="line">                 : : &quot;l&quot;(addr), &quot;r&quot;(val));</span><br><span class="line">    #else</span><br><span class="line">    *addr = val;</span><br><span class="line">    #endif</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// System-level atomics (跨 CPU-GPU)</span><br><span class="line">template &lt;typename T&gt;</span><br><span class="line">__device__ T ld_acquire_sys_global(const T* addr) &#123;</span><br><span class="line">    T val;</span><br><span class="line">    asm volatile(&quot;ld.acquire.sys.global.b32 %0, [%1];&quot; </span><br><span class="line">                 : &quot;=r&quot;(val) : &quot;l&quot;(addr));</span><br><span class="line">    return val;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="TMA-Tensor-Memory-Accelerator"><a href="#TMA-Tensor-Memory-Accelerator" class="headerlink" title="TMA (Tensor Memory Accelerator)"></a>TMA (Tensor Memory Accelerator)</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">// SM90+ 特性: 硬件加速的张量内存拷贝</span><br><span class="line">#ifndef DISABLE_SM90_FEATURES</span><br><span class="line">template &lt;int kNumBytes&gt;</span><br><span class="line">__device__ void tma_load(void* dst, const void* src) &#123;</span><br><span class="line">    // 使用 TMA 硬件单元</span><br><span class="line">    // 更高带宽，更低延迟</span><br><span class="line">&#125;</span><br><span class="line">#endif</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-5-Warp-level-原语"><a href="#4-5-Warp-level-原语" class="headerlink" title="4.5 Warp-level 原语"></a>4.5 Warp-level 原语</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">// Warp reduce sum</span><br><span class="line">__device__ int warp_reduce_sum(int val) &#123;</span><br><span class="line">    #pragma unroll</span><br><span class="line">    for (int offset = 16; offset &gt; 0; offset /= 2) &#123;</span><br><span class="line">        val += __shfl_down_sync(0xffffffff, val, offset);</span><br><span class="line">    &#125;</span><br><span class="line">    return val;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// Elect one thread in warp (通常是 lane 0)</span><br><span class="line">__device__ bool elect_one_sync() &#123;</span><br><span class="line">    return __match_any_sync(0xffffffff, 1) == 0xffffffff &amp;&amp; </span><br><span class="line">           get_lane_id() == 0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">// Warp-level copy</span><br><span class="line">#define UNROLLED_WARP_COPY(num, lane_id, count, dst, src, ld_fn, st_fn) \</span><br><span class="line">    _Pragma(&quot;unroll&quot;) \</span><br><span class="line">    for (int i = lane_id * num; i &lt; count; i += 32 * num) &#123; \</span><br><span class="line">        auto tmp = ld_fn(src + i); \</span><br><span class="line">        st_fn(dst + i, tmp); \</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="5-性能优化策略"><a href="#5-性能优化策略" class="headerlink" title="5. 性能优化策略"></a>5. 性能优化策略</h2><h3 id="5-1-通信计算重叠"><a href="#5-1-通信计算重叠" class="headerlink" title="5.1 通信计算重叠"></a>5.1 通信计算重叠</h3><p><strong>策略 1: 独立 Stream</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># dispatch 和 expert 计算在不同 stream</span></span><br><span class="line">comm_stream = buffer.get_comm_stream()</span><br><span class="line">event = buffer.dispatch(..., async_mode=<span class="literal">True</span>)</span><br><span class="line"><span class="comment"># comm_stream 上执行 dispatch</span></span><br><span class="line"><span class="comment"># 主流继续执行其他计算</span></span><br><span class="line"><span class="keyword">with</span> event:</span><br><span class="line">    expert_forward()  <span class="comment"># 等待 dispatch 完成</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>策略 2: Hook-based (低延迟模式)</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">recv_x, handle, event, recv_hook = buffer.low_latency_dispatch(...)</span><br><span class="line"><span class="comment"># dispatch 立即返回</span></span><br><span class="line"><span class="comment"># 在计算前调用 hook 确保数据到达</span></span><br><span class="line"><span class="keyword">if</span> recv_hook:</span><br><span class="line">    recv_hook()  <span class="comment"># 轮询接收</span></span><br><span class="line">expert_output = expert_forward(recv_x)</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-负载均衡"><a href="#5-2-负载均衡" class="headerlink" title="5.2 负载均衡"></a>5.2 负载均衡</h3><p><strong>Channel 机制</strong>:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// 将 tokens 分成 num_channels 个 channel</span><br><span class="line">// 每个 SM/warp 处理一个 channel</span><br><span class="line">// 动态平衡各 channel 负载</span><br><span class="line">get_channel_task_range(num_tokens, num_channels, </span><br><span class="line">                       channel_id, start_idx, end_idx);</span><br></pre></td></tr></table></figure>
+
+<p><strong>SM 分配</strong>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 可配置 SM 数量</span></span><br><span class="line">Buffer.set_num_sms(<span class="number">20</span>)  <span class="comment"># 使用 20 个 SM</span></span><br><span class="line">config = Config(num_sms=<span class="number">20</span>, ...)</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-3-内存带宽优化"><a href="#5-3-内存带宽优化" class="headerlink" title="5.3 内存带宽优化"></a>5.3 内存带宽优化</h3><ol>
+<li><strong>对齐</strong>: 所有数据对齐到 128 bytes</li>
+<li><strong>Coalescing</strong>: 连续线程访问连续内存</li>
+<li><strong>向量化</strong>: 使用 int4&#x2F;int2 向量 load&#x2F;store</li>
+<li><strong>Cache 控制</strong>: 使用 PTX 指令控制 L2 cache</li>
+</ol>
+<h3 id="5-4-延迟优化-低延迟模式"><a href="#5-4-延迟优化-低延迟模式" class="headerlink" title="5.4 延迟优化 (低延迟模式)"></a>5.4 延迟优化 (低延迟模式)</h3><ol>
+<li><strong>预分配固定 buffer</strong>: 避免动态地址计算</li>
+<li><strong>轮询接收</strong>: 主动轮询而非被动等待</li>
+<li><strong>主要使用 RDMA</strong>: 减少 NVLink hop，但在允许的配置下也会利用 NVLink 加速</li>
+<li><strong>超时机制</strong>: 快速检测和跳过慢 rank</li>
+</ol>
+<hr>
+<h2 id="6-使用示例"><a href="#6-使用示例" class="headerlink" title="6. 使用示例"></a>6. 使用示例</h2><h3 id="6-1-基本用法-节点内"><a href="#6-1-基本用法-节点内" class="headerlink" title="6.1 基本用法 (节点内)"></a>6.1 基本用法 (节点内)</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> torch</span><br><span class="line"><span class="keyword">import</span> torch.distributed <span class="keyword">as</span> dist</span><br><span class="line"><span class="keyword">import</span> deep_ep</span><br><span class="line"></span><br><span class="line"><span class="comment"># 初始化分布式环境</span></span><br><span class="line">dist.init_process_group(backend=<span class="string">&#x27;nccl&#x27;</span>)</span><br><span class="line">group = dist.new_group()</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 buffer</span></span><br><span class="line">nvl_buffer_size = <span class="number">256</span> * <span class="number">1024</span> * <span class="number">1024</span>  <span class="comment"># 256 MB</span></span><br><span class="line">buffer = deep_ep.Buffer(</span><br><span class="line">    group=group,</span><br><span class="line">    num_nvl_bytes=nvl_buffer_size</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># MoE forward</span></span><br><span class="line">x = torch.randn(<span class="number">4096</span>, <span class="number">7168</span>, dtype=torch.bfloat16, device=<span class="string">&#x27;cuda&#x27;</span>)</span><br><span class="line">topk_idx = routing(x)  <span class="comment"># [4096, 8]</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># Layout 计算</span></span><br><span class="line">num_tokens_per_rank, _, num_tokens_per_expert, is_token_in_rank, _ = \</span><br><span class="line">    buffer.get_dispatch_layout(topk_idx, num_experts=<span class="number">64</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Dispatch</span></span><br><span class="line"><span class="comment"># Config参数: (num_sms, nvl_send_chunk, nvl_recv_chunk, rdma_send_chunk, rdma_recv_chunk)</span></span><br><span class="line">config = deep_ep.Config(<span class="number">20</span>, <span class="number">6</span>, <span class="number">256</span>, <span class="number">6</span>, <span class="number">128</span>)  <span class="comment"># 8 ranks示例</span></span><br><span class="line">recv_x, recv_x_scales, handle, event = buffer.dispatch(</span><br><span class="line">    x=x,</span><br><span class="line">    topk_idx=topk_idx,</span><br><span class="line">    topk_weights=topk_weights,</span><br><span class="line">    num_tokens_per_rank=num_tokens_per_rank,</span><br><span class="line">    is_token_in_rank=is_token_in_rank,</span><br><span class="line">    num_tokens_per_expert=num_tokens_per_expert,</span><br><span class="line">    config=config</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Expert 计算</span></span><br><span class="line"><span class="keyword">with</span> event:  <span class="comment"># 等待 dispatch 完成</span></span><br><span class="line">    expert_output = expert_forward(recv_x)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Combine</span></span><br><span class="line">output, combine_event = buffer.combine(</span><br><span class="line">    x=expert_output,</span><br><span class="line">    handle=handle,</span><br><span class="line">    topk_weights=topk_weights,</span><br><span class="line">    config=config</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-2-节点间通信"><a href="#6-2-节点间通信" class="headerlink" title="6.2 节点间通信"></a>6.2 节点间通信</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 创建 buffer (包含 RDMA)</span></span><br><span class="line">rdma_buffer_size = <span class="number">1024</span> * <span class="number">1024</span> * <span class="number">1024</span>  <span class="comment"># 1 GB</span></span><br><span class="line">buffer = deep_ep.Buffer(</span><br><span class="line">    group=group,</span><br><span class="line">    num_nvl_bytes=nvl_buffer_size,</span><br><span class="line">    num_rdma_bytes=rdma_buffer_size</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 获取 RDMA layout</span></span><br><span class="line">num_tokens_per_rdma_rank = ...  <span class="comment"># 额外的 RDMA level 统计</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># Dispatch (internode)</span></span><br><span class="line">recv_x, recv_x_scales, handle, event = buffer.internode_dispatch(</span><br><span class="line">    x=x,</span><br><span class="line">    topk_idx=topk_idx,</span><br><span class="line">    topk_weights=topk_weights,</span><br><span class="line">    num_tokens_per_rank=num_tokens_per_rank,</span><br><span class="line">    num_tokens_per_rdma_rank=num_tokens_per_rdma_rank,</span><br><span class="line">    is_token_in_rank=is_token_in_rank,</span><br><span class="line">    num_tokens_per_expert=num_tokens_per_expert,</span><br><span class="line">    config=config</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Combine (internode)</span></span><br><span class="line">output, combine_event = buffer.internode_combine(</span><br><span class="line">    x=expert_output,</span><br><span class="line">    handle=handle,</span><br><span class="line">    topk_weights=topk_weights,</span><br><span class="line">    config=config</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-3-低延迟模式-推理"><a href="#6-3-低延迟模式-推理" class="headerlink" title="6.3 低延迟模式 (推理)"></a>6.3 低延迟模式 (推理)</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 创建低延迟 buffer</span></span><br><span class="line">buffer = deep_ep.Buffer(</span><br><span class="line">    group=group,</span><br><span class="line">    num_rdma_bytes=rdma_buffer_size,</span><br><span class="line">    low_latency_mode=<span class="literal">True</span>,</span><br><span class="line">    num_qps_per_rank=num_experts  <span class="comment"># 每个 expert 一个 QP</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 清理 buffer (首次或 batch 改变时)</span></span><br><span class="line">buffer.clean_low_latency_buffer(</span><br><span class="line">    num_max_dispatch_tokens_per_rank=<span class="number">512</span>,</span><br><span class="line">    hidden=<span class="number">7168</span>,</span><br><span class="line">    num_experts=<span class="number">64</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Dispatch with hook</span></span><br><span class="line">recv_x, recv_x_scales, handle, event, recv_hook = \</span><br><span class="line">    buffer.low_latency_dispatch(</span><br><span class="line">        x=x,</span><br><span class="line">        topk_idx=topk_idx,</span><br><span class="line">        num_max_dispatch_tokens_per_rank=<span class="number">512</span>,</span><br><span class="line">        num_experts=<span class="number">64</span>,</span><br><span class="line">        use_fp8=<span class="literal">True</span>,</span><br><span class="line">        return_recv_hook=<span class="literal">True</span></span><br><span class="line">    )</span><br><span class="line"></span><br><span class="line"><span class="comment"># 调用 hook 确保数据到达</span></span><br><span class="line"><span class="keyword">if</span> recv_hook:</span><br><span class="line">    recv_hook()</span><br><span class="line"></span><br><span class="line"><span class="comment"># Expert 计算</span></span><br><span class="line">expert_output = expert_forward(recv_x)</span><br><span class="line"></span><br><span class="line"><span class="comment"># Combine with hook</span></span><br><span class="line">output, combine_event, recv_hook = buffer.low_latency_combine(</span><br><span class="line">    x=expert_output,</span><br><span class="line">    topk_idx=topk_idx,</span><br><span class="line">    topk_weights=topk_weights,</span><br><span class="line">    handle=handle,</span><br><span class="line">    num_max_dispatch_tokens_per_rank=<span class="number">512</span>,</span><br><span class="line">    num_experts=<span class="number">64</span>,</span><br><span class="line">    return_recv_hook=<span class="literal">True</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> recv_hook:</span><br><span class="line">    recv_hook()</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="7-配置和调优"><a href="#7-配置和调优" class="headerlink" title="7. 配置和调优"></a>7. 配置和调优</h2><h3 id="7-1-关键配置参数"><a href="#7-1-关键配置参数" class="headerlink" title="7.1 关键配置参数"></a>7.1 关键配置参数</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Config</span>:</span><br><span class="line">    num_sms: <span class="built_in">int</span>                           <span class="comment"># 使用的 SM 数量 (通常 20)</span></span><br><span class="line">    num_max_nvl_chunked_send_tokens: <span class="built_in">int</span>   <span class="comment"># NVLink 发送端 chunk 大小</span></span><br><span class="line">    num_max_nvl_chunked_recv_tokens: <span class="built_in">int</span>   <span class="comment"># NVLink 接收端 chunk 大小</span></span><br><span class="line">    num_max_rdma_chunked_send_tokens: <span class="built_in">int</span>  <span class="comment"># RDMA 发送端 chunk 大小</span></span><br><span class="line">    num_max_rdma_chunked_recv_tokens: <span class="built_in">int</span>  <span class="comment"># RDMA 接收端 chunk 大小</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 示例：</span></span><br><span class="line"><span class="comment"># Intranode (8 ranks): Config(20, 6, 256, 6, 128)</span></span><br><span class="line"><span class="comment"># Internode (16 ranks): Config(20, 36, 288, 20, 128)</span></span><br><span class="line"><span class="comment"># Internode (64 ranks): Config(20, 32, 288, 8, 128)</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="7-2-环境变量"><a href="#7-2-环境变量" class="headerlink" title="7.2 环境变量"></a>7.2 环境变量</h3><p><strong>NVSHMEM 配置</strong>:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># IBGDA 相关</span></span><br><span class="line"><span class="built_in">export</span> NVSHMEM_IB_ENABLE_IBGDA=1</span><br><span class="line"><span class="built_in">export</span> NVSHMEM_IBGDA_NUM_RC_PER_PE=24  <span class="comment"># 每个 PE 的 QP 数</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># QP 深度 (必须 &gt; 在途 WR 数)</span></span><br><span class="line"><span class="built_in">export</span> NVSHMEM_QP_DEPTH=1024</span><br><span class="line"></span><br><span class="line"><span class="comment"># 禁用 P2P (低延迟模式可能需要)</span></span><br><span class="line"><span class="built_in">export</span> NVSHMEM_DISABLE_P2P=0/1</span><br><span class="line"></span><br><span class="line"><span class="comment"># 内存相关</span></span><br><span class="line"><span class="built_in">export</span> NVSHMEM_CUMEM_GRANULARITY=536870912  <span class="comment"># 512 MB</span></span><br><span class="line"><span class="built_in">export</span> NVSHMEM_MAX_TEAMS=7</span><br></pre></td></tr></table></figure>
+
+<p><strong>编译选项</strong>:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># SM 架构</span></span><br><span class="line"><span class="built_in">export</span> TORCH_CUDA_ARCH_LIST=<span class="string">&quot;9.0&quot;</span>  <span class="comment"># H100/H800</span></span><br><span class="line"><span class="built_in">export</span> TORCH_CUDA_ARCH_LIST=<span class="string">&quot;8.0&quot;</span>  <span class="comment"># A100</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 禁用 SM90 特性 (Ampere)</span></span><br><span class="line"><span class="built_in">export</span> DISABLE_SM90_FEATURES=1</span><br><span class="line"></span><br><span class="line"><span class="comment"># 禁用激进 PTX 指令</span></span><br><span class="line"><span class="built_in">export</span> DISABLE_AGGRESSIVE_PTX_INSTRS=1</span><br><span class="line"></span><br><span class="line"><span class="comment"># topk_idx 位数</span></span><br><span class="line"><span class="built_in">export</span> TOPK_IDX_BITS=64  <span class="comment"># or 32</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="7-3-性能调优建议"><a href="#7-3-性能调优建议" class="headerlink" title="7.3 性能调优建议"></a>7.3 性能调优建议</h3><p><strong>Training (高吞吐)</strong>:</p>
+<ul>
+<li>使用 internode kernels (跨节点) 或 intranode kernels (节点内)</li>
+<li>num_sms &#x3D; 20-40</li>
+<li>chunk sizes 根据 rank 数量调整 (参考 get_dispatch_config&#x2F;get_combine_config)</li>
+<li>buffer 大小通过 Config.get_nvl_buffer_size_hint() 和 get_rdma_buffer_size_hint() 计算</li>
+</ul>
+<p><strong>Inference Prefill</strong>:</p>
+<ul>
+<li>同 training 配置</li>
+<li>启用 FP8 量化可减少带宽需求</li>
+</ul>
+<p><strong>Inference Decode (低延迟)</strong>:</p>
+<ul>
+<li>使用 low_latency kernels</li>
+<li>num_qps_per_rank &#x3D; num_local_experts (每个 expert 一个 QP)</li>
+<li>num_max_dispatch_tokens_per_rank 根据最大 batch 设置</li>
+<li>NVSHMEM_QP_DEPTH &gt;&#x3D; (num_max_dispatch_tokens_per_rank + 1) * 2</li>
+<li>考虑启用 hook-based 重叠以提高吞吐</li>
+</ul>
+<hr>
+<h2 id="8-与-DeepSeek-V3-的关系"><a href="#8-与-DeepSeek-V3-的关系" class="headerlink" title="8. 与 DeepSeek-V3 的关系"></a>8. 与 DeepSeek-V3 的关系</h2><p>DeepEP 是为 DeepSeek-V3 架构设计的通信库，针对其特定需求优化:</p>
+<h3 id="8-1-DeepSeek-V3-MoE-配置"><a href="#8-1-DeepSeek-V3-MoE-配置" class="headerlink" title="8.1 DeepSeek-V3 MoE 配置"></a>8.1 DeepSeek-V3 MoE 配置</h3><ul>
+<li><strong>总 experts</strong>: 256</li>
+<li><strong>Active experts</strong>: top-8</li>
+<li><strong>Group-limited gating</strong>: top-4 groups</li>
+<li><strong>Hidden dimension</strong>: 7168</li>
+<li><strong>EP parallelism</strong>: 通常 64-256 ranks</li>
+</ul>
+<h3 id="8-2-关键优化对应"><a href="#8-2-关键优化对应" class="headerlink" title="8.2 关键优化对应"></a>8.2 关键优化对应</h3><ol>
+<li><p><strong>Group-limited gating</strong></p>
+<ul>
+<li>限制每个 token 只能选择特定 groups 的 experts</li>
+<li>DeepEP 的 asymmetric bandwidth forwarding 优化这个模式</li>
+</ul>
+</li>
+<li><p><strong>高维度 (7168)</strong></p>
+<ul>
+<li>带宽密集型</li>
+<li>DeepEP 的向量化和 TMA 加速</li>
+</ul>
+</li>
+<li><p><strong>大规模并行 (256 ranks)</strong></p>
+<ul>
+<li>需要高效的 RDMA 和多级拓扑</li>
+<li>DeepEP 的 RDMA + NVLink 混合架构</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2 id="9-总结"><a href="#9-总结" class="headerlink" title="9. 总结"></a>9. 总结</h2><p>DeepEP 是一个高度优化的 MoE 通信库，具有以下特点:</p>
+<p><strong>三种通信模式</strong>: intranode (NVLink), internode (RDMA+NVLink), low-latency (纯 RDMA)</p>
+<p><strong>高性能</strong>: </p>
+<ul>
+<li>Intranode: ~155 GB&#x2F;s (接近硬件峰值)</li>
+<li>Internode: ~43-58 GB&#x2F;s (RDMA 带宽限制)</li>
+<li>Low-latency: &lt;200 us (256 ranks)</li>
+</ul>
+<p><strong>灵活性</strong>:</p>
+<ul>
+<li>支持 FP8&#x2F;BF16</li>
+<li>可配置 SM 和 channel 数量</li>
+<li>支持通信计算重叠</li>
+</ul>
+<p><strong>鲁棒性</strong>:</p>
+<ul>
+<li>超时检测和容错</li>
+<li>动态 rank 屏蔽</li>
+<li>完善的错误检查</li>
+</ul>
+<p><strong>可扩展性</strong>:</p>
+<ul>
+<li>支持数百个 ranks</li>
+<li>多级拓扑 (NVLink + RDMA)</li>
+<li>高效的元数据交换</li>
+</ul>
+<p>DeepEP 是大规模 MoE 训练和推理的关键基础设施组件，充分利用现代 GPU 和网络硬件的能力。</p>
+</article>
+<div class="article-footer">
+    <section id="license">
+      <div class="header"><span>许可协议</span></div>
+      <div class="body"><p>本文采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">署名-非商业性使用-相同方式共享 4.0 国际</a> 许可协议，转载请注明出处。</p>
+</div>
+    </section>
+    
+
+</div>
+
+<div class="related-wrap" id="read-next"><section class="body"><div class="item" id="prev"><div class="note">较新文章</div><a href="/2025/11/17/HCCL_DeepDive/">HCCL 集合通信库设计分析</a></div><div class="item" id="next"><div class="note">较早文章</div><a href="/2025/07/24/Hello-World/">Hello World</a></div></section></div>
+
+
+
+
+  <div class="related-wrap md-text" id="comments">
+    <section class='header cmt-title cap theme'>
+      <p>快来参与讨论吧~</p>
+
+    </section>
+    <section class='body cmt-body giscus'>
+      
+
+<svg class="loading" style="vertical-align:middle;fill:currentColor;overflow:hidden;" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2709"><path d="M832 512c0-176-144-320-320-320V128c211.2 0 384 172.8 384 384h-64zM192 512c0 176 144 320 320 320v64C300.8 896 128 723.2 128 512h64z" p-id="2710"></path></svg>
+
+<div id="giscus" src="https://giscus.app/client.js" data-repo="nash635/nash635.github.io" data-repo-id="R_kgDOKBdEtA" data-category="General" data-category-id="DIC_kwDOKBdEtM4CxbhU" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous"></div>
+
+    </section>
+  </div>
+
+
+
+<footer class="page-footer footnote"><hr><div class="text"><p>本站由 <a href="/">nash635</a> 使用 <a target="_blank" rel="noopener" href="https://github.com/xaoxuu/hexo-theme-stellar/tree/1.33.1">Stellar 1.33.1</a> 主题创建。<br>本博客所有文章除特别声明外，均采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可协议，转载请注明出处。</p>
+</div></footer>
+<div class="main-mask" onclick="sidebar.dismiss()"></div></div><aside class="l_right">
+<div class="widgets">
+
+
+
+<widget class="widget-wrapper toc" id="data-toc" collapse="false"><div class="widget-header dis-select"><span class="name">本文目录</span><a class="cap-action" onclick="sidebar.toggleTOC()" ><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6h11m-11 6h11m-11 6h11M4 6h1v4m-1 0h2m0 8H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></a></div><div class="widget-body"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#DeepEP-%E6%9E%B6%E6%9E%84%E5%88%86%E6%9E%90%E6%96%87%E6%A1%A3"><span class="toc-text">DeepEP 架构分析文档</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E9%A1%B9%E7%9B%AE%E6%A6%82%E8%BF%B0"><span class="toc-text">1. 项目概述</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E7%89%B9%E6%80%A7"><span class="toc-text">核心特性</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%80%A7%E8%83%BD%E6%8C%87%E6%A0%87"><span class="toc-text">性能指标</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BE%9D%E8%B5%96%E7%9A%84%E5%85%B3%E9%94%AE%E6%8A%80%E6%9C%AF"><span class="toc-text">依赖的关键技术</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-NVSHMEM-NVIDIA-Symmetric-Memory"><span class="toc-text">1. NVSHMEM (NVIDIA Symmetric Memory)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-IBGDA-InfiniBand-GPU-Direct-Async"><span class="toc-text">2. IBGDA (InfiniBand GPU Direct Async)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-NVLink"><span class="toc-text">3. NVLink</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-CUDA-IPC-Inter-Process-Communication"><span class="toc-text">4. CUDA IPC (Inter-Process Communication)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5-CUDA-Fabric-API-%E5%8F%AF%E9%80%89"><span class="toc-text">5. CUDA Fabric API (可选)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#6-TMA-Tensor-Memory-Accelerator-SM90"><span class="toc-text">6. TMA (Tensor Memory Accelerator, SM90+)</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84"><span class="toc-text">2. 系统架构</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-1-%E6%95%B4%E4%BD%93%E6%9E%B6%E6%9E%84%E5%9B%BE"><span class="toc-text">2.1 整体架构图</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-%E6%95%B0%E6%8D%AE%E6%B5%81%E6%9E%B6%E6%9E%84"><span class="toc-text">2.2 数据流架构</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E6%A0%B8%E5%BF%83%E6%A8%A1%E5%9D%97%E8%AF%A6%E8%A7%A3"><span class="toc-text">3. 核心模块详解</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-Buffer-%E7%AE%A1%E7%90%86%E6%A8%A1%E5%9D%97"><span class="toc-text">3.1 Buffer 管理模块</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E8%81%8C%E8%B4%A3"><span class="toc-text">核心职责</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84"><span class="toc-text">关键数据结构</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96%E6%B5%81%E7%A8%8B"><span class="toc-text">初始化流程</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-2-Intranode-Kernels-%E8%8A%82%E7%82%B9%E5%86%85%E9%80%9A%E4%BF%A1"><span class="toc-text">3.2 Intranode Kernels (节点内通信)</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E5%8E%9F%E7%90%86"><span class="toc-text">核心原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E4%BC%98%E5%8C%96%E6%8A%80%E6%9C%AF"><span class="toc-text">关键优化技术</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Combine-%E6%B5%81%E7%A8%8B"><span class="toc-text">Combine 流程</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-3-Internode-Kernels-%E8%8A%82%E7%82%B9%E9%97%B4%E9%80%9A%E4%BF%A1"><span class="toc-text">3.3 Internode Kernels (节点间通信)</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E5%8E%9F%E7%90%86-1"><span class="toc-text">核心原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%8B%93%E6%89%91%E7%BB%93%E6%9E%84"><span class="toc-text">拓扑结构</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Dispatch-%E6%B5%81%E7%A8%8B"><span class="toc-text">Dispatch 流程</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#SourceMeta-%E7%BC%96%E7%A0%81"><span class="toc-text">SourceMeta 编码</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E4%BC%98%E5%8C%96"><span class="toc-text">关键优化</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-4-Low-Latency-Kernels-%E4%BD%8E%E5%BB%B6%E8%BF%9F%E5%86%85%E6%A0%B8"><span class="toc-text">3.4 Low-Latency Kernels (低延迟内核)</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E8%AE%BE%E8%AE%A1%E7%9B%AE%E6%A0%87"><span class="toc-text">设计目标</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E7%89%B9%E6%80%A7-1"><span class="toc-text">核心特性</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Dispatch-%E6%B5%81%E7%A8%8B-1"><span class="toc-text">Dispatch 流程</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Combine-%E6%B5%81%E7%A8%8B-1"><span class="toc-text">Combine 流程</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E4%BC%98%E5%8C%96-1"><span class="toc-text">关键优化</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-5-Layout-%E8%AE%A1%E7%AE%97%E6%A8%A1%E5%9D%97"><span class="toc-text">3.5 Layout 计算模块</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E5%8A%9F%E8%83%BD"><span class="toc-text">核心功能</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E7%AE%97%E6%B3%95%E6%B5%81%E7%A8%8B"><span class="toc-text">算法流程</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E4%BC%98%E5%8C%96%E6%8A%80%E6%9C%AF"><span class="toc-text">优化技术</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-6-%E4%BA%8B%E4%BB%B6%E5%92%8C%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6"><span class="toc-text">3.6 事件和同步机制</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#EventOverlap-%E7%B1%BB"><span class="toc-text">EventOverlap 类</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E4%BD%BF%E7%94%A8%E6%A8%A1%E5%BC%8F"><span class="toc-text">使用模式</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E5%85%B3%E9%94%AE%E6%8A%80%E6%9C%AF%E7%BB%86%E8%8A%82"><span class="toc-text">4. 关键技术细节</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-FP8-%E9%87%8F%E5%8C%96"><span class="toc-text">4.1 FP8 量化</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#Per-Token-%E9%87%8F%E5%8C%96"><span class="toc-text">Per-Token 量化</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Scale-%E5%AD%98%E5%82%A8%E4%BC%98%E5%8C%96"><span class="toc-text">Scale 存储优化</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-IBGDA-InfiniBand-GPU-Direct-Async"><span class="toc-text">4.2 IBGDA (InfiniBand GPU Direct Async)</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%8E%9F%E7%90%86"><span class="toc-text">原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%A4%9A-QP-%E5%B9%B6%E8%A1%8C"><span class="toc-text">多 QP 并行</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-Barrier-%E5%AE%9E%E7%8E%B0"><span class="toc-text">4.3 Barrier 实现</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#GPU-only-Barrier"><span class="toc-text">GPU-only Barrier</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-4-%E5%86%85%E5%AD%98%E8%AE%BF%E9%97%AE%E4%BC%98%E5%8C%96"><span class="toc-text">4.4 内存访问优化</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#Load-Store-%E6%8C%87%E4%BB%A4%E9%80%89%E6%8B%A9"><span class="toc-text">Load&#x2F;Store 指令选择</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#TMA-Tensor-Memory-Accelerator"><span class="toc-text">TMA (Tensor Memory Accelerator)</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-5-Warp-level-%E5%8E%9F%E8%AF%AD"><span class="toc-text">4.5 Warp-level 原语</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E7%AD%96%E7%95%A5"><span class="toc-text">5. 性能优化策略</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-%E9%80%9A%E4%BF%A1%E8%AE%A1%E7%AE%97%E9%87%8D%E5%8F%A0"><span class="toc-text">5.1 通信计算重叠</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1"><span class="toc-text">5.2 负载均衡</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-3-%E5%86%85%E5%AD%98%E5%B8%A6%E5%AE%BD%E4%BC%98%E5%8C%96"><span class="toc-text">5.3 内存带宽优化</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-4-%E5%BB%B6%E8%BF%9F%E4%BC%98%E5%8C%96-%E4%BD%8E%E5%BB%B6%E8%BF%9F%E6%A8%A1%E5%BC%8F"><span class="toc-text">5.4 延迟优化 (低延迟模式)</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E4%BD%BF%E7%94%A8%E7%A4%BA%E4%BE%8B"><span class="toc-text">6. 使用示例</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#6-1-%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95-%E8%8A%82%E7%82%B9%E5%86%85"><span class="toc-text">6.1 基本用法 (节点内)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-2-%E8%8A%82%E7%82%B9%E9%97%B4%E9%80%9A%E4%BF%A1"><span class="toc-text">6.2 节点间通信</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-3-%E4%BD%8E%E5%BB%B6%E8%BF%9F%E6%A8%A1%E5%BC%8F-%E6%8E%A8%E7%90%86"><span class="toc-text">6.3 低延迟模式 (推理)</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-%E9%85%8D%E7%BD%AE%E5%92%8C%E8%B0%83%E4%BC%98"><span class="toc-text">7. 配置和调优</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#7-1-%E5%85%B3%E9%94%AE%E9%85%8D%E7%BD%AE%E5%8F%82%E6%95%B0"><span class="toc-text">7.1 关键配置参数</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-2-%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F"><span class="toc-text">7.2 环境变量</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-3-%E6%80%A7%E8%83%BD%E8%B0%83%E4%BC%98%E5%BB%BA%E8%AE%AE"><span class="toc-text">7.3 性能调优建议</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-%E4%B8%8E-DeepSeek-V3-%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="toc-text">8. 与 DeepSeek-V3 的关系</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#8-1-DeepSeek-V3-MoE-%E9%85%8D%E7%BD%AE"><span class="toc-text">8.1 DeepSeek-V3 MoE 配置</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-2-%E5%85%B3%E9%94%AE%E4%BC%98%E5%8C%96%E5%AF%B9%E5%BA%94"><span class="toc-text">8.2 关键优化对应</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#9-%E6%80%BB%E7%BB%93"><span class="toc-text">9. 总结</span></a></li></ol></li></ol></div><div class="widget-footer"><a class="top" onclick="util.scrollTop()"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path stroke-linejoin="round" d="m9 15.5l3-3l3 3m-6-4l3-3l3 3"/><path d="M7 3.338A9.95 9.95 0 0 1 12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12c0-1.821.487-3.53 1.338-5"/></g></svg><span>回到顶部</span></a><a class="buttom" onclick="util.scrollComment()"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M8 10.5h8M8 14h5.5M17 3.338A9.95 9.95 0 0 0 12 2C6.477 2 2 6.477 2 12c0 1.6.376 3.112 1.043 4.453c.178.356.237.763.134 1.148l-.595 2.226a1.3 1.3 0 0 0 1.591 1.592l2.226-.596a1.63 1.63 0 0 1 1.149.133A9.96 9.96 0 0 0 12 22c5.523 0 10-4.477 10-10c0-1.821-.487-3.53-1.338-5"/></svg><span>参与讨论</span></a></div></widget>
+</div></aside><div class='float-panel'>
+  <button type='button' style='display:none' class='laptop-only rightbar-toggle mobile' onclick='sidebar.rightbar()'>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6h11m-11 6h11m-11 6h11M4 6h1v4m-1 0h2m0 8H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+  </button>
+  <button type='button' style='display:none' class='mobile-only leftbar-toggle mobile' onclick='sidebar.leftbar()'>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 11c0-3.771 0-5.657 1.172-6.828C4.343 3 6.229 3 10 3h4c3.771 0 5.657 0 6.828 1.172C22 5.343 22 7.229 22 11v2c0 3.771 0 5.657-1.172 6.828C19.657 21 17.771 21 14 21h-4c-3.771 0-5.657 0-6.828-1.172C2 18.657 2 16.771 2 13z"/><path id="sep" stroke-linecap="round" d="M5.5 10h6m-5 4h4m4.5 7V3"/></g></svg>
+  </button>
+</div>
+</div><div class="scripts">
+
+
+<script type="text/javascript">
+  window.canonical = {"originalHost":null,"officialHosts":["localhost"],"encoded":""};
+  const ctx = {
+    date_suffix: {
+      just: `刚刚`,
+      min: `分钟前`,
+      hour: `小时前`,
+      day: `天前`,
+    },
+    root : `/`,
+    tag_plugins: {
+      chat: Object.assign({"api":"https://siteinfo.listentothewind.cn/api/v1"}),
+    }
+  };
+
+  // required plugins (only load if needs)
+  if (`local_search`) {
+    ctx.search = {};
+    ctx.search.service = `local_search`;
+    if (ctx.search.service == 'local_search') {
+      let service_obj = Object.assign({}, `{"field":"all","path":"/search.json","content":true,"skip_search":null,"sort":"-date"}`);
+      ctx.search[ctx.search.service] = service_obj;
+    }
+  }
+  const def = {
+    avatar: `https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/avatar/round/3442075.svg`,
+    cover: `https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/cover/76b86c0226ffd.svg`,
+    loading: `https://api.iconify.design/eos-icons:three-dots-loading.svg?color=%231cd0fd`,
+  };
+  const deps = {
+    jquery: `https://gcore.jsdelivr.net/npm/jquery@3.7/dist/jquery.min.js`,
+    marked: `https://gcore.jsdelivr.net/npm/marked@13.0/lib/marked.umd.min.js`,
+    lazyload: `/%5Bobject%20Object%5D`
+  }
+  
+
+</script>
+
+<script type="text/javascript">
+  
+  function RunItem() {
+    this.list = []; // 存放回调函数
+    this.start = () => {
+      for (var i = 0; i < this.list.length; i++) {
+        this.list[i].run();
+      }
+    };
+    this.push = (fn, name, setRequestAnimationFrame = true) => {
+      let myfn = fn
+      if (setRequestAnimationFrame) {
+        myfn = () => {
+          utils.requestAnimationFrame(fn)
+        }
+      }
+      var f = new Item(myfn, name);
+      this.list.push(f);
+    };
+    this.remove = (name) => {
+      for (let index = 0; index < this.list.length; index++) {
+        const e = this.list[index];
+        if (e.name == name) {
+          this.list.splice(index, 1);
+        }
+      }
+    }
+    // 构造一个可以run的对象
+    function Item(fn, name) {
+      // 函数名称
+      this.name = name || fn.name;
+      // run方法
+      this.run = () => {
+        try {
+          fn()
+        } catch (error) {
+          console.log(error);
+        }
+      };
+    }
+  }
+
+  const utils = {
+    // 懒加载 css https://github.com/filamentgroup/loadCSS
+    css: (href, before, media, attributes) => {
+      var doc = window.document;
+      var ss = doc.createElement("link");
+      var ref;
+      if (before) {
+        ref = before;
+      } else {
+        var refs = (doc.body || doc.getElementsByTagName("head")[0]).childNodes;
+        ref = refs[refs.length - 1];
+      }
+      var sheets = doc.styleSheets;
+      if (attributes) {
+        for (var attributeName in attributes) {
+          if (attributes.hasOwnProperty(attributeName)) {
+            ss.setAttribute(attributeName, attributes[attributeName]);
+          }
+        }
+      }
+      ss.rel = "stylesheet";
+      ss.href = href;
+      ss.media = "only x";
+      function ready(cb) {
+        if (doc.body) {
+          return cb();
+        }
+        setTimeout(function () {
+          ready(cb);
+        });
+      }
+      ready(function () {
+        ref.parentNode.insertBefore(ss, before ? ref : ref.nextSibling);
+      });
+      var onloadcssdefined = function (cb) {
+        var resolvedHref = ss.href;
+        var i = sheets.length;
+        while (i--) {
+          if (sheets[i].href === resolvedHref) {
+            return cb();
+          }
+        }
+        setTimeout(function () {
+          onloadcssdefined(cb);
+        });
+      };
+      function loadCB() {
+        if (ss.addEventListener) {
+          ss.removeEventListener("load", loadCB);
+        }
+        ss.media = media || "all";
+      }
+      if (ss.addEventListener) {
+        ss.addEventListener("load", loadCB);
+      }
+      ss.onloadcssdefined = onloadcssdefined;
+      onloadcssdefined(loadCB);
+      return ss;
+    },
+
+    js: (src, opt) => new Promise((resolve, reject) => {
+      var script = document.createElement('script');
+      if (src.startsWith('/')) {
+        src = ctx.root + src.substring(1);
+      }
+      script.src = src;
+      if (opt) {
+        for (let key of Object.keys(opt)) {
+          script[key] = opt[key]
+        }
+      } else {
+        // 默认异步，如果需要同步，第二个参数传入 {} 即可
+        script.async = true
+      }
+      script.onerror = reject
+      script.onload = script.onreadystatechange = function () {
+        const loadState = this.readyState
+        if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+        script.onload = script.onreadystatechange = null
+        resolve()
+      }
+      document.head.appendChild(script)
+    }),
+
+    jq: (fn) => {
+      if (typeof jQuery === 'undefined') {
+        utils.js(deps.jquery).then(fn)
+      } else {
+        fn()
+      }
+    },
+
+    onLoading: (el) => {
+      if (el) {
+        $(el).append('<div class="loading-wrap"><svg xmlns="http://www.w3.org/2000/svg" width="2em" height="2em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"><path stroke-dasharray="60" stroke-dashoffset="60" stroke-opacity=".3" d="M12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="1.3s" values="60;0"/></path><path stroke-dasharray="15" stroke-dashoffset="15" d="M12 3C16.9706 3 21 7.02944 21 12"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.3s" values="15;0"/><animateTransform attributeName="transform" dur="1.5s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/></path></g></svg></div>');
+      }
+    },
+    onLoadSuccess: (el) => {
+      if (el) {
+        $(el).find('.loading-wrap').remove();
+      }
+    },
+    onLoadFailure: (el) => {
+      if (el) {
+        $(el).find('.loading-wrap svg').remove();
+        $(el).find('.loading-wrap').append('<svg xmlns="http://www.w3.org/2000/svg" width="2em" height="2em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path stroke-dasharray="60" stroke-dashoffset="60" d="M12 3L21 20H3L12 3Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.5s" values="60;0"/></path><path stroke-dasharray="6" stroke-dashoffset="6" d="M12 10V14"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="6;0"/></path></g><circle cx="12" cy="17" r="1" fill="currentColor" fill-opacity="0"><animate fill="freeze" attributeName="fill-opacity" begin="0.8s" dur="0.4s" values="0;1"/></circle></svg>');
+        $(el).find('.loading-wrap').addClass('error');
+      }
+    },
+    request: (el, url, callback, onFailure) => {
+      const maxRetry = 3;
+      let retryCount = 0;
+
+      return new Promise((resolve, reject) => {
+        const load = () => {
+          utils.onLoading?.(el);
+
+          let timedOut = false;
+          const timeout = setTimeout(() => {
+            timedOut = true;
+            console.warn('[request] 超时:', url);
+
+            if (++retryCount >= maxRetry) {
+              utils.onLoadFailure?.(el);
+              onFailure?.();
+              reject('请求超时');
+            } else {
+              setTimeout(load, 1000);
+            }
+          }, 5000);
+
+          fetch(url).then(resp => {
+            if (timedOut) return;
+            clearTimeout(timeout);
+
+            if (!resp.ok) throw new Error('响应失败');
+            return resp;
+          }).then(data => {
+            if (timedOut) return;
+            utils.onLoadSuccess?.(el);
+            callback(data);
+            resolve(data);
+          }).catch(err => {
+            clearTimeout(timeout);
+            console.warn('[request] 错误:', err);
+
+            if (++retryCount >= maxRetry) {
+              utils.onLoadFailure?.(el);
+              onFailure?.();
+              reject(err);
+            } else {
+              setTimeout(load, 1000);
+            }
+          });
+        };
+
+        load();
+      });
+    },
+    requestWithoutLoading: (url, options = {}, maxRetry = 2, timeout = 5000) => {
+      return new Promise((resolve, reject) => {
+        let retryCount = 0;
+
+        const tryRequest = () => {
+          let timedOut = false;
+          const timer = setTimeout(() => {
+            timedOut = true;
+            if (++retryCount > maxRetry) reject('timeout');
+            else tryRequest();
+          }, timeout);
+
+          fetch(url, options)
+            .then(resp => {
+              clearTimeout(timer);
+              if (!resp.ok) throw new Error('bad response');
+              resolve(resp);
+            })
+            .catch(err => {
+              clearTimeout(timer);
+              if (++retryCount > maxRetry) reject(err);
+              else setTimeout(tryRequest, 500);
+            });
+        };
+
+        tryRequest();
+      });
+    },
+    /********************** requestAnimationFrame ********************************/
+    // 1、requestAnimationFrame 会把每一帧中的所有 DOM 操作集中起来，在一次重绘或回流中就完成，并且重绘或回流的时间间隔紧紧跟随浏览器的刷新频率，一般来说，这个频率为每秒60帧。
+    // 2、在隐藏或不可见的元素中，requestAnimationFrame 将不会进行重绘或回流，这当然就意味着更少的的 cpu，gpu 和内存使用量。
+    requestAnimationFrame: (fn) => {
+      if (!window.requestAnimationFrame) {
+        window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
+      }
+      window.requestAnimationFrame(fn)
+    },
+    dark: {},
+  };
+
+  // utils.dark.mode 当前模式 dark or light
+  // utils.dark.toggle() 暗黑模式触发器
+  // utils.dark.push(callBack[,"callBackName"]) 传入触发器回调函数
+  utils.dark.method = {
+    toggle: new RunItem(),
+  };
+  utils.dark = Object.assign(utils.dark, {
+    push: utils.dark.method.toggle.push,
+  });
+</script>
+<script>
+  const sidebar = {
+    leftbar: () => {
+      if (l_body) {
+        l_body.toggleAttribute('leftbar');
+        l_body.removeAttribute('rightbar');
+      }
+    },
+    rightbar: () => {
+      if (l_body) {
+        l_body.toggleAttribute('rightbar');
+        l_body.removeAttribute('leftbar');
+      }
+    },
+    dismiss: () => {
+      if (l_body) {
+        l_body.removeAttribute('leftbar');
+        l_body.removeAttribute('rightbar');
+      }
+    },
+    toggleTOC: () => {
+      document.querySelector('#data-toc').classList.toggle('collapse');
+    }
+  }
+</script>
+<script type="text/javascript">
+  (() => {
+    const tagSwitchers = document.querySelectorAll('.tag-subtree.parent-tag > a > .tag-switcher-wrapper')
+    for (const tagSwitcher of tagSwitchers) {
+      tagSwitcher.addEventListener('click', (e) => {
+        const parent = e.target.closest('.tag-subtree.parent-tag')
+        parent.classList.toggle('expanded')
+        e.preventDefault()
+      })
+    }
+
+    // Get active tag from query string, then activate it.
+    const urlParams = new URLSearchParams(window.location.search)
+    const activeTag = urlParams.get('tag')
+    if (activeTag) {
+      let tag = document.querySelector(`.tag-subtree[data-tag="${activeTag}"]`)
+      if (tag) {
+        tag.querySelector('a').classList.add('active')
+        
+        while (tag) {
+          tag.classList.add('expanded')
+          tag = tag.parentElement.closest('.tag-subtree.parent-tag')
+        }
+      }
+    }
+  })()
+</script>
+
+<script async src="https://gcore.jsdelivr.net/npm/vanilla-lazyload@19.1/dist/lazyload.min.js"></script>
+<script>
+  // https://www.npmjs.com/package/vanilla-lazyload
+  // Set the options globally
+  // to make LazyLoad self-initialize
+  window.lazyLoadOptions = {
+    elements_selector: ".lazy",
+    callback_loaded: (el) => {
+      el.classList.add('loaded');
+      const wrapper = el.closest('.lazy-box');
+      const icon = wrapper?.querySelector('.lazy-icon');
+      if (icon) icon.remove();
+    }
+  };
+  // Listen to the initialization event
+  // and get the instance of LazyLoad
+  window.addEventListener(
+    "LazyLoad::Initialized",
+    function (event) {
+      window.lazyLoadInstance = event.detail.instance;
+    },
+    false
+  );
+  document.addEventListener('DOMContentLoaded', function () {
+    window.lazyLoadInstance?.update();
+  });
+
+  window.wrapLazyloadImages = (container) => {
+    if (typeof container === 'string') {
+      container = document.querySelector(container);
+    }
+    if (!container) return;
+    
+    const images = container.querySelectorAll('img');
+    images.forEach((img) => {
+      if (img.classList.contains('lazy')) return;
+
+      const src = img.getAttribute('src');
+      if (!src) return;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'lazy-box';
+
+      const newImg = img.cloneNode();
+      newImg.removeAttribute('src');
+      newImg.setAttribute('data-src', src);
+      newImg.classList.add('lazy');
+
+      const icon = document.createElement('div');
+      icon.className = 'lazy-icon';
+      if (def.loading) {
+        icon.style.backgroundImage = `url("${def.loading}")`;
+      }
+
+      wrapper.appendChild(newImg);
+      wrapper.appendChild(icon);
+
+      img.replaceWith(wrapper);
+    });
+
+    // 通知 LazyLoad 更新
+    if (window.lazyLoadInstance?.update) {
+      window.lazyLoadInstance.update();
+    }
+  }
+  
+</script>
+
+<!-- required -->
+<script src="/js/main.js?v=1.33.1" defer></script>
+
+<script type="text/javascript">
+  const applyTheme = (theme) => {
+    if (theme === 'auto') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', theme)
+    }
+
+    // applyThemeToGiscus(theme)
+  }
+
+  // FIXME: 这会导致无法使用 preferred_color_scheme 以外的主题
+  const applyThemeToGiscus = (theme) => {
+    // theme = theme === 'auto' ? 'preferred_color_scheme' : theme
+    const cmt = document.getElementById('giscus')
+    if (cmt) {
+      // This works before giscus load.
+      cmt.setAttribute('data-theme', theme)
+    }
+
+    const iframe = document.querySelector('#comments > section.giscus > iframe')
+    if (iframe) {
+      // This works after giscus loaded.
+      const src = iframe.src
+      const newSrc = src.replace(/theme=[\w]+/, `theme=${theme}`)
+      iframe.src = newSrc
+    }
+  }
+
+  const switchTheme = () => {
+    // light -> dark -> auto -> light -> ...
+    const currentTheme = document.documentElement.getAttribute('data-theme')
+    let newTheme;
+    switch (currentTheme) {
+      case 'light':
+        newTheme = 'dark'
+        break
+      case 'dark':
+        newTheme = 'auto'
+        break
+      default:
+        newTheme = 'light'
+    }
+    applyTheme(newTheme)
+    window.localStorage.setItem('Stellar.theme', newTheme)
+    utils.dark.mode = newTheme === 'auto' ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : newTheme;
+    utils.dark.method.toggle.start();
+
+    const messages = {
+      light: `切换到浅色模式`,
+      dark: `切换到深色模式`,
+      auto: `切换到跟随系统配色`,
+    }
+    hud?.toast?.(messages[newTheme])
+  }
+
+  (() => {
+    // Apply user's preferred theme, if any.
+    const theme = window.localStorage.getItem('Stellar.theme')
+    if (theme !== null) {
+      applyTheme(theme)
+    } else {
+      utils.dark.mode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    utils.dark.method.toggle.start();
+  })()
+</script>
+
+
+<!-- optional -->
+
+  <script type="module">
+  const el = document.querySelector('#comments #giscus');
+  util.viewportLazyload(el, load_discus, false);
+
+  function load_discus() {
+    if (!el) return;
+    try {
+        el.innerHTML = '';
+      } catch (error) {
+        console.error(error);
+      }
+      const script = document.createElement('script');
+      script.async = true;
+      for (const key of Object.keys(el.attributes)) {
+        const attr = el.attributes[key];
+        if (['class', 'id'].includes(attr.name) === false) {
+          script.setAttribute(attr.name, attr.value);
+        }
+      }
+      el.appendChild(script);
+  }
+</script>
+
+
+
+
+<script defer>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    ctx.services = Object.assign({}, JSON.parse(`{"mdrender":{"js":"/js/services/mdrender.js"},"siteinfo":{"js":"/js/services/siteinfo.js","api":null},"ghinfo":{"js":"/js/services/ghinfo.js"},"rating":{"js":"/js/services/rating.js","api":"https://star-vote.xaox.cc/api/rating"},"vote":{"js":"/js/services/vote.js","api":"https://star-vote.xaox.cc/api/vote"},"sites":{"js":"/js/services/sites.js"},"friends":{"js":"/js/services/friends.js"},"friends_and_posts":{"js":"/js/services/friends_and_posts.js"},"timeline":{"js":"/js/services/timeline.js"},"fcircle":{"js":"/js/services/fcircle.js"},"weibo":{"js":"/js/services/weibo.js"},"memos":{"js":"/js/services/memos.js"},"voice":{"js":"/js/plugins/voice.js"},"video":{"js":"/js/plugins/video.js"},"download-file":{"js":"/js/plugins/download-file.js"},"twikoo":{"js":"/js/services/twikoo_latest_comment.js"},"waline":{"js":"/js/services/waline_latest_comment.js"},"artalk":{"js":"/js/services/artalk_latest_comment.js"},"giscus":{"js":"/js/services/giscus_latest_comment.js"},"contributors":{"edit_this_page":{"_posts/":null,"wiki/stellar/":"https://github.com/xaoxuu/hexo-theme-stellar-docs/blob/main/"},"js":"/js/services/contributors.js"}}`));
+    for (let id of Object.keys(ctx.services)) {
+      const js = ctx.services[id].js;
+      if (id == 'siteinfo') {
+        ctx.cardlinks = document.querySelectorAll('a.link-card[cardlink]');
+        if (ctx.cardlinks?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            setCardLink(ctx.cardlinks);
+          });
+        }
+      } else if (id == 'voice') {
+        ctx.voiceAudios = document.querySelectorAll('.voice>audio');
+        if (ctx.voiceAudios?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            createVoiceDom(ctx.voiceAudios);
+          });
+        }
+      } else if (id == 'video') {
+        ctx.videos = document.querySelectorAll('.video>video');
+        if (ctx.videos?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            videoEvents(ctx.videos);
+          });
+        }
+      } else if (id == 'download-file') {
+        ctx.files = document.querySelectorAll('.file');
+        if (ctx.files?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            downloadFileEvent(ctx.files);
+          });
+        }
+      } else {
+        const els = document.getElementsByClassName(`ds-${id}`);
+        if (els?.length > 0) {
+          utils.jq(() => {
+            if (id == 'timeline' || 'memos' || 'marked') {
+              utils.js(deps.marked).then(function () {
+                utils.js(js, { defer: true });
+              });
+            } else {
+              utils.js(js, { defer: true });
+            }
+          });
+        }
+      }
+    }
+
+    // chat iphone time
+    let phoneTimes = document.querySelectorAll('.chat .status-bar .time');
+
+    if (phoneTimes.length > 0) {
+      NowTime();
+      var date = new Date();
+      var sec = date.getSeconds();
+      var firstAdjustInterval = setInterval(firstAdjustTime, 1000 * (60 - sec));
+    }
+
+    function firstAdjustTime() {
+      NowTime();
+      clearInterval(firstAdjustInterval);
+      setInterval(NowTime, 1000 * 60);
+    }
+
+    function NowTime() {
+      for (let i = 0; i < phoneTimes.length; ++i) {
+        var timeSpan = phoneTimes[i];
+        var date = new Date();
+        var hour = date.getHours();
+        var min = date.getMinutes();
+        timeSpan.innerHTML = check(hour) + ":" + check(min);
+      }
+    };
+
+    function check(val) {
+      if (val < 10) {
+        return ("0" + val);
+      }
+      return (val);
+    }
+
+    // chat quote
+    const chat_quote_obverser = new IntersectionObserver((entries, observer) => {
+      entries.filter((entry) => { return entry.isIntersecting }).sort((a, b) => a.intersectionRect.y !== b.intersectionRect.y ? a.intersectionRect.y - b.intersectionRect.y : a.intersectionRect.x - b.intersectionRect.x).forEach((entry, index) => {
+          observer.unobserve(entry.target);
+          setTimeout(() => {
+            entry.target.classList.add('quote-blink');
+            setTimeout(() => {
+              entry.target.classList.remove('quote-blink');
+            }, 1000);
+          }, Math.max(100, 16) * (index + 1));
+        });
+    });
+
+    var chatQuotes = document.querySelectorAll(".chat .talk .quote");
+    chatQuotes.forEach((quote) => {
+      quote.addEventListener('click', function () {
+        var chatCellDom = document.getElementById("quote-" + quote.getAttribute("quotedCellTag"));
+        if (chatCellDom) {
+          var chatDiv = chatCellDom.parentElement;
+          var mid = chatDiv.clientHeight / 2;
+          var offsetTop = chatCellDom.offsetTop;
+          if (offsetTop > mid - chatCellDom.clientHeight / 2) {
+            chatDiv.scrollTo({
+              top: chatCellDom.offsetTop - mid + chatCellDom.clientHeight / 2,
+              behavior: "smooth"
+            });
+          } else {
+            chatDiv.scrollTo({
+              top: 0,
+              behavior: "smooth"
+            });
+          }
+          chat_quote_obverser.observe(chatCellDom);
+        }
+      });
+    });
+  });
+</script>
+
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    ctx.search = {
+      path: `/search.json`,
+    }
+    utils.js('/js/search/local-search.js', { defer: true });
+  });
+</script><script>
+  window.FPConfig = {
+    delay: 0,
+    ignoreKeywords: [],
+    maxRPS: 5,
+    hoverDelay: 25
+  };
+</script>
+<script defer src="https://gcore.jsdelivr.net/npm/flying-pages@2/flying-pages.min.js"></script><script>
+  ctx.fancybox = {
+    selector: `.timenode p>img`,
+    css: `https://gcore.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css`,
+    js: `https://gcore.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js`
+  };
+  var selector = '[data-fancybox]:not(.error), .with-fancybox .atk-content img:not([atk-emoticon])';
+  if (ctx.fancybox.selector) {
+    selector += `, ${ctx.fancybox.selector}`
+  }
+  var needFancybox = document.querySelectorAll(selector).length !== 0;
+  if (!needFancybox) {
+    const memos = document.getElementsByClassName('ds-memos');
+    if (memos != undefined && memos.length > 0) {
+      needFancybox = true;
+    }
+    const fancybox = document.getElementsByClassName('with-fancybox');
+    if (fancybox != undefined && fancybox.length > 0) {
+      needFancybox = true;
+    }
+  }
+  if (needFancybox) {
+    utils.css(ctx.fancybox.css);
+    utils.js(ctx.fancybox.js, { defer: true }).then(function () {
+      Fancybox.bind(selector, {
+        hideScrollbar: false,
+        Thumbs: {
+          autoStart: false,
+        },
+        caption: (fancybox, slide) => {
+          return slide.triggerEl.alt || slide.triggerEl.dataset.caption || null
+        }
+      });
+    })
+  }
+</script>
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    const swiper_api = document.getElementById('swiper-api');
+    if (swiper_api != undefined) {
+      utils.css(`https://unpkg.com/swiper@10.3/swiper-bundle.min.css`);
+      utils.js(`https://unpkg.com/swiper@10.3/swiper-bundle.min.js`, { defer: true }).then(function () {
+        const effect = swiper_api.getAttribute('effect') || '';
+        var swiper = new Swiper('.swiper#swiper-api', {
+          slidesPerView: 'auto',
+          spaceBetween: 8,
+          centeredSlides: true,
+          effect: effect,
+          rewind: true,
+          pagination: {
+            el: '.swiper-pagination',
+            clickable: true,
+          },
+          navigation: {
+            nextEl: '.swiper-button-next',
+            prevEl: '.swiper-button-prev',
+          },
+        });
+      })
+    }
+  });
+</script>
+
+<script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.6/MathJax.js?config=TeX-AMS-MML_HTMLorMML" async></script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+  MathJax.Hub.Config({
+    tex2jax: {
+      skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    }
+  });
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    window.codeElements = document.querySelectorAll('.code');
+    if (window.codeElements.length > 0) {
+      ctx.copycode = {
+        default_text: `Copy`,
+        success_text: `Copied`,
+        toast: `复制成功`,
+      };
+      utils.js('/js/plugins/copycode.js');
+    }
+  });
+</script>
+
+
+<!-- inject -->
+
+</div></body></html>

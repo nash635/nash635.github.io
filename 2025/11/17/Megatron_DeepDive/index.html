@@ -1,0 +1,1459 @@
+
+<!DOCTYPE html><html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="hexo-theme" content="https://github.com/xaoxuu/hexo-theme-stellar/tree/1.33.1" theme-name="Stellar" theme-version="1.33.1">
+  
+  
+  <meta name="generator" content="Hexo 7.3.0">
+  <meta http-equiv='x-dns-prefetch-control' content='on' />
+  
+  <meta name="renderer" content="webkit">
+  <meta name="force-rendering" content="webkit">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+  <meta name="HandheldFriendly" content="True" >
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000">
+  <meta name="theme-color" content="#f9fafb">
+  <title>Megatron-LM 架构深度分析 - My Blog</title>
+
+  
+    <meta name="description" content="Megatron-LM是NVIDIA开发的大规模Transformer模型训练GPU优化库，支持多种并行策略和混合精度训练。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Megatron-LM 架构深度分析">
+<meta property="og:url" content="https://nash635.github.io/2025/11/17/Megatron_DeepDive/">
+<meta property="og:site_name" content="My Blog">
+<meta property="og:description" content="Megatron-LM是NVIDIA开发的大规模Transformer模型训练GPU优化库，支持多种并行策略和混合精度训练。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-11-17T02:00:02.000Z">
+<meta property="article:modified_time" content="2025-11-17T14:42:49.955Z">
+<meta property="article:author" content="nash635">
+<meta property="article:tag" content="Megatron">
+<meta property="article:tag" content="NVIDIA">
+<meta property="article:tag" content="大语言模型">
+<meta property="article:tag" content="分布式训练">
+<meta property="article:tag" content="Transformer">
+<meta name="twitter:card" content="summary">
+  
+  
+  
+  <meta name="keywords" content="Megatron,NVIDIA,大语言模型,分布式训练,Transformer">
+
+  <!-- feed -->
+  
+
+  <link rel="stylesheet" href="/css/main.css?v=1.33.1">
+
+
+  
+
+  
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"nash635","sameAs":[]},"dateCreated":"2025-11-17T10:00:02+08:00","dateModified":"2025-11-17T22:42:49+08:00","datePublished":"2025-11-17T10:00:02+08:00","description":"","headline":"Megatron-LM 架构深度分析","mainEntityOfPage":{"@type":"WebPage","@id":"https://nash635.github.io/2025/11/17/Megatron_DeepDive/"},"publisher":{"@type":"Organization","name":"nash635","sameAs":[]},"url":"https://nash635.github.io/2025/11/17/Megatron_DeepDive/","keywords":"Megatron, NVIDIA, 大语言模型, 分布式训练, Transformer","image":[]}</script>
+  
+</head>
+<body>
+
+<div class="l_body content" id="start" layout="post" type="tech" ><aside class="l_left"><div class="sidebg"></div><div class="leftbar-container">
+
+
+<header class="header"><div class="logo-wrap"><a class="avatar" href="/"><div class="bg" style="opacity:0;background-image:url(https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/avatar/round/rainbow64@3x.webp);"></div><img no-lazy class="avatar" src="/img/avatar.png" onerror="javascript:this.classList.add('error');this.src='https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/image/2659360.svg';"></a><a class="title" href="/"><div class="main">nash635's Blog</div><div class="sub cap">造车，造船，造飞机</div></a></div></header>
+
+<div class="nav-area">
+
+<nav class="menu dis-select"></nav>
+</div>
+<div class="widgets">
+<div class="search-wrapper" id="search-wrapper"><form class="search-form"><a class="search-button" onclick="document.getElementById(&quot;search-input&quot;).focus();"><svg t="1705074644177" viewBox="0 0 1025 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1560" width="200" height="200"><path d="M1008.839137 935.96571L792.364903 719.491476a56.783488 56.783488 0 0 0-80.152866 0 358.53545 358.53545 0 1 1 100.857314-335.166073 362.840335 362.840335 0 0 1-3.689902 170.145468 51.248635 51.248635 0 1 0 99.217358 26.444296 462.057693 462.057693 0 1 0-158.255785 242.303546l185.930047 185.725053a51.248635 51.248635 0 0 0 72.568068 0 51.248635 51.248635 0 0 0 0-72.978056z" p-id="1561"></path><path d="M616.479587 615.969233a50.428657 50.428657 0 0 0-61.498362-5.534852 174.655348 174.655348 0 0 1-177.525271 3.484907 49.403684 49.403684 0 0 0-58.833433 6.76482l-3.074918 2.869923a49.403684 49.403684 0 0 0 8.609771 78.10292 277.767601 277.767601 0 0 0 286.992355-5.739847 49.403684 49.403684 0 0 0 8.404776-76.667958z" p-id="1562"></path></svg></a><input type="text" class="search-input" id="search-input" placeholder="站内搜索"></form><div id="search-result"></div><div class="search-no-result">没有找到内容！</div></div>
+
+
+
+<widget class="widget-wrapper recent post-list"><div class="widget-header dis-select"><span class="name">最近更新</span></div><div class="widget-body fs14"><a class="item title" href="/2025/11/17/HCCL_DeepDive/"><span class="title">HCCL 集合通信库设计分析</span></a><a class="item title" href="/2025/11/17/DeepEP_DeepDive/"><span class="title">DeepEP 架构分析</span></a><a class="item title" href="/2025/11/17/Megatron_DeepDive/"><span class="title">Megatron-LM 架构深度分析</span></a><a class="item title" href="/2025/11/17/TransformerEngine_DeepDive/"><span class="title">Transformer Engine 架构设计分析</span></a><a class="item title" href="/2025/07/24/Hello-World/"><span class="title">Hello World</span></a></div></widget>
+</div>
+
+</div></aside><div class="l_main" id="main">
+
+
+
+
+
+<div class="article banner top">
+  <div class="content">
+    <div class="top bread-nav footnote"><div class="left"><div class="flex-row" id="breadcrumb"><a class="cap breadcrumb" href="/">主页</a>
+<span class="sep"></span><a class="cap breadcrumb" href="/">文章</a><span class="sep"></span><a class="cap breadcrumb-link" href="/categories/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E5%88%86%E6%9E%90/">系统架构分析</a></div>
+<div class="flex-row" id="post-meta"><span class="text created">发布于：<time datetime="2025-11-17T02:00:02.000Z">2025-11-17</time></span><span class="sep updated"></span><span class="text updated">更新于：<time datetime="2025-11-17T14:42:49.955Z">2025-11-17</time></span></div></div></div>
+    
+    <div class="bottom only-title">
+      
+      <div class="text-area">
+        <h1 class="text title"><span>Megatron-LM 架构深度分析</span></h1>
+        
+      </div>
+    </div>
+    
+  </div>
+  </div><article class="md-text content"><h1 id="Megatron-LM-代码库架构分析报告"><a href="#Megatron-LM-代码库架构分析报告" class="headerlink" title="Megatron-LM 代码库架构分析报告"></a>Megatron-LM 代码库架构分析报告</h1><h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ol>
+<li><a href="#1-%E9%A1%B9%E7%9B%AE%E6%A6%82%E8%BF%B0">项目概述</a></li>
+<li><a href="#2-%E6%95%B4%E4%BD%93%E6%9E%B6%E6%9E%84">整体架构</a></li>
+<li><a href="#3-%E6%A0%B8%E5%BF%83%E6%A8%A1%E5%9D%97%E5%88%86%E6%9E%90">核心模块分析</a></li>
+<li><a href="#4-%E5%B9%B6%E8%A1%8C%E7%AD%96%E7%95%A5%E8%AF%A6%E8%A7%A3">并行策略详解</a></li>
+<li><a href="#5-%E6%A8%A1%E5%9E%8B%E5%AE%9E%E7%8E%B0">模型实现</a></li>
+<li><a href="#6-%E8%AE%AD%E7%BB%83%E6%B5%81%E7%A8%8B">训练流程</a></li>
+<li><a href="#7-%E5%85%B3%E9%94%AE%E6%8A%80%E6%9C%AF%E7%89%B9%E6%80%A7">关键技术特性</a></li>
+<li><a href="#8-%E4%BB%A3%E7%A0%81%E7%BB%84%E7%BB%87%E7%BB%93%E6%9E%84">代码组织结构</a></li>
+</ol>
+<hr>
+<h2 id="1-项目概述"><a href="#1-项目概述" class="headerlink" title="1. 项目概述"></a>1. 项目概述</h2><h3 id="1-1-项目定位"><a href="#1-1-项目定位" class="headerlink" title="1.1 项目定位"></a>1.1 项目定位</h3><p>Megatron-LM 是 NVIDIA 开发的用于大规模 Transformer 模型训练的 GPU 优化库，包含两个核心部分：</p>
+<ul>
+<li><strong>Megatron-LM</strong>: 参考实现，包含完整的训练脚本和工具</li>
+<li><strong>Megatron Core</strong>: 可组合的生产级库，提供模块化的构建块</li>
+</ul>
+<h3 id="1-2-主要特点"><a href="#1-2-主要特点" class="headerlink" title="1.2 主要特点"></a>1.2 主要特点</h3><ul>
+<li>GPU 优化的 Transformer 实现</li>
+<li>多种并行策略（TP、PP、DP、EP、CP）</li>
+<li>支持多种模型架构（GPT、LLaMA、Mixtral、Mamba、DeepSeek-V3 等）</li>
+<li>FP8、FP16、BF16、FP4 混合精度训练</li>
+<li>分布式优化器和检查点</li>
+<li>MoE（Mixture of Experts）支持，包括 Shared Experts</li>
+<li>MLA（Multi-Latent Attention）高效注意力机制</li>
+<li>动态推理引擎（Dynamic Inference Engine）</li>
+<li>容错训练（NVRx 集成）</li>
+<li>HyperCommGrid N维通信网格管理</li>
+<li>推理引擎和模型导出（TensorRT-LLM）</li>
+</ul>
+<h3 id="1-3-生态系统"><a href="#1-3-生态系统" class="headerlink" title="1.3 生态系统"></a>1.3 生态系统</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;Dependencies 依赖库&quot;</span><br><span class="line">        TE[Transformer Engine&lt;br/&gt;FP8优化内核]</span><br><span class="line">        Energon[Megatron Energon&lt;br/&gt;多模态数据加载器]</span><br><span class="line">        NVRx[NVRx&lt;br/&gt;容错训练]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Core 核心库&quot;</span><br><span class="line">        MCore[Megatron Core&lt;br/&gt;核心构建块]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Applications 应用层&quot;</span><br><span class="line">        MLM[Megatron-LM&lt;br/&gt;参考实现]</span><br><span class="line">        Bridge[Megatron Bridge&lt;br/&gt;HF互操作]</span><br><span class="line">        NeMo[NeMo Framework&lt;br/&gt;企业框架]</span><br><span class="line">        NeMoRL[NeMo RL&lt;br/&gt;RLHF训练]</span><br><span class="line">        ModelOpt[TensorRT ModelOpt&lt;br/&gt;模型优化]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    TE --&gt; MCore</span><br><span class="line">    Energon --&gt; MCore</span><br><span class="line">    NVRx --&gt; MCore</span><br><span class="line">    </span><br><span class="line">    MCore --&gt; MLM</span><br><span class="line">    MCore --&gt; Bridge</span><br><span class="line">    MCore --&gt; NeMo</span><br><span class="line">    MCore --&gt; NeMoRL</span><br><span class="line">    MCore --&gt; ModelOpt</span><br><span class="line">    </span><br><span class="line">    style MCore fill:#4CAF50</span><br><span class="line">    style MLM fill:#2196F3</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="2-整体架构"><a href="#2-整体架构" class="headerlink" title="2. 整体架构"></a>2. 整体架构</h2><h3 id="2-1-项目结构"><a href="#2-1-项目结构" class="headerlink" title="2.1 项目结构"></a>2.1 项目结构</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line">Megatron-LM/</span><br><span class="line">├── megatron/                          # 核心代码目录</span><br><span class="line">│   ├── core/                          # Megatron Core 生产库</span><br><span class="line">│   │   ├── models/                    # 模型实现</span><br><span class="line">│   │   │   ├── gpt/                   # GPT 模型</span><br><span class="line">│   │   │   ├── bert/                  # BERT 模型</span><br><span class="line">│   │   │   ├── T5/                    # T5 模型</span><br><span class="line">│   │   │   ├── mamba/                 # Mamba（SSM）模型</span><br><span class="line">│   │   │   ├── multimodal/            # 多模态模型</span><br><span class="line">│   │   │   ├── retro/                 # RETRO 模型</span><br><span class="line">│   │   │   └── vision/                # 视觉模型</span><br><span class="line">│   │   ├── transformer/               # Transformer 构建块</span><br><span class="line">│   │   │   ├── transformer_layer.py   # Transformer 层</span><br><span class="line">│   │   │   ├── transformer_block.py   # Transformer 块</span><br><span class="line">│   │   │   ├── transformer_config.py  # 配置类</span><br><span class="line">│   │   │   ├── attention.py           # 注意力机制</span><br><span class="line">│   │   │   └── mlp.py                 # MLP 层</span><br><span class="line">│   │   ├── tensor_parallel/           # 张量并行</span><br><span class="line">│   │   ├── pipeline_parallel/         # 流水线并行</span><br><span class="line">│   │   ├── distributed/               # 分布式训练（FSDP、DDP）</span><br><span class="line">│   │   ├── optimizer/                 # 优化器</span><br><span class="line">│   │   ├── datasets/                  # 数据集加载器</span><br><span class="line">│   │   ├── inference/                 # 推理引擎</span><br><span class="line">│   │   ├── export/                    # 模型导出</span><br><span class="line">│   │   ├── quantization/              # 量化</span><br><span class="line">│   │   ├── fusions/                   # 融合内核</span><br><span class="line">│   │   └── dist_checkpointing/        # 分布式检查点</span><br><span class="line">│   ├── training/                      # 训练循环和工具</span><br><span class="line">│   ├── legacy/                        # 遗留组件</span><br><span class="line">│   └── post_training/                 # 后训练（RLHF 等）</span><br><span class="line">├── examples/                          # 示例脚本</span><br><span class="line">│   ├── gpt3/                          # GPT-3 示例</span><br><span class="line">│   ├── llama/                         # LLaMA 示例</span><br><span class="line">│   ├── mixtral/                       # Mixtral 示例</span><br><span class="line">│   ├── multimodal/                    # 多模态示例</span><br><span class="line">│   └── post_training/                 # 后训练示例</span><br><span class="line">├── tools/                             # 工具脚本</span><br><span class="line">│   ├── preprocess_data.py            # 数据预处理</span><br><span class="line">│   ├── checkpoint/                    # 检查点转换工具</span><br><span class="line">│   └── run_text_generation_server.py # 推理服务器</span><br><span class="line">└── tests/                             # 测试套件</span><br><span class="line">    ├── unit_tests/                    # 单元测试</span><br><span class="line">    └── functional_tests/              # 功能测试</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-2-系统架构图"><a href="#2-2-系统架构图" class="headerlink" title="2.2 系统架构图"></a>2.2 系统架构图</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;User Interface 用户界面&quot;</span><br><span class="line">        PretrainScripts[预训练脚本&lt;br/&gt;pretrain_gpt.py&lt;br/&gt;pretrain_llama.py]</span><br><span class="line">        Examples[示例代码&lt;br/&gt;examples/]</span><br><span class="line">        Tools[工具集&lt;br/&gt;tools/]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Training Layer 训练层&quot;</span><br><span class="line">        TrainingLoop[训练循环&lt;br/&gt;training/training.py]</span><br><span class="line">        DataLoader[数据加载&lt;br/&gt;datasets/]</span><br><span class="line">        Checkpoint[检查点管理&lt;br/&gt;checkpointing.py]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Megatron Core 核心层&quot;</span><br><span class="line">        subgraph &quot;Models 模型层&quot;</span><br><span class="line">            GPT[GPTModel]</span><br><span class="line">            BERT[BERTModel]</span><br><span class="line">            T5[T5Model]</span><br><span class="line">            Multimodal[MultimodalModel]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;Transformer Components 组件层&quot;</span><br><span class="line">            TransformerBlock[TransformerBlock]</span><br><span class="line">            TransformerLayer[TransformerLayer]</span><br><span class="line">            Attention[Attention]</span><br><span class="line">            MLP[MLP/MoE]</span><br><span class="line">            Embedding[Embedding]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;Parallelism 并行层&quot;</span><br><span class="line">            TensorParallel[Tensor Parallel&lt;br/&gt;张量并行]</span><br><span class="line">            PipelineParallel[Pipeline Parallel&lt;br/&gt;流水线并行]</span><br><span class="line">            DataParallel[Data Parallel&lt;br/&gt;数据并行]</span><br><span class="line">            ExpertParallel[Expert Parallel&lt;br/&gt;专家并行]</span><br><span class="line">            ContextParallel[Context Parallel&lt;br/&gt;上下文并行]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;Optimization 优化层&quot;</span><br><span class="line">            Optimizer[分布式优化器&lt;br/&gt;DistributedOptimizer]</span><br><span class="line">            MixedPrecision[混合精度&lt;br/&gt;FP8/FP16/BF16]</span><br><span class="line">            GradAccum[梯度累积]</span><br><span class="line">            ParamScheduler[参数调度器]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;Inference &amp; Export 推理导出层&quot;</span><br><span class="line">            InferenceEngine[推理引擎&lt;br/&gt;Dynamic Inference]</span><br><span class="line">            ExportModule[模型导出&lt;br/&gt;TensorRT-LLM/ONNX]</span><br><span class="line">        end</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Infrastructure 基础设施层&quot;</span><br><span class="line">        ParallelState[并行状态管理&lt;br/&gt;parallel_state.py]</span><br><span class="line">        ProcessGroups[进程组&lt;br/&gt;process_groups_config.py]</span><br><span class="line">        Memory[内存管理&lt;br/&gt;GlobalMemoryBuffer]</span><br><span class="line">        Timers[性能计时器&lt;br/&gt;timers.py]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;External Dependencies 外部依赖&quot;</span><br><span class="line">        PyTorch[PyTorch]</span><br><span class="line">        TE[Transformer Engine]</span><br><span class="line">        NCCL[NCCL]</span><br><span class="line">        Apex[Apex&lt;br/&gt;可选]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    PretrainScripts --&gt; TrainingLoop</span><br><span class="line">    Examples --&gt; TrainingLoop</span><br><span class="line">    Tools --&gt; Checkpoint</span><br><span class="line">    </span><br><span class="line">    TrainingLoop --&gt; GPT</span><br><span class="line">    TrainingLoop --&gt; BERT</span><br><span class="line">    TrainingLoop --&gt; T5</span><br><span class="line">    TrainingLoop --&gt; Multimodal</span><br><span class="line">    TrainingLoop --&gt; DataLoader</span><br><span class="line">    TrainingLoop --&gt; Checkpoint</span><br><span class="line">    </span><br><span class="line">    GPT --&gt; TransformerBlock</span><br><span class="line">    BERT --&gt; TransformerBlock</span><br><span class="line">    T5 --&gt; TransformerBlock</span><br><span class="line">    Multimodal --&gt; TransformerBlock</span><br><span class="line">    </span><br><span class="line">    TransformerBlock --&gt; TransformerLayer</span><br><span class="line">    TransformerLayer --&gt; Attention</span><br><span class="line">    TransformerLayer --&gt; MLP</span><br><span class="line">    TransformerBlock --&gt; Embedding</span><br><span class="line">    </span><br><span class="line">    TransformerLayer --&gt; TensorParallel</span><br><span class="line">    TransformerBlock --&gt; PipelineParallel</span><br><span class="line">    TrainingLoop --&gt; DataParallel</span><br><span class="line">    MLP --&gt; ExpertParallel</span><br><span class="line">    Attention --&gt; ContextParallel</span><br><span class="line">    </span><br><span class="line">    TrainingLoop --&gt; Optimizer</span><br><span class="line">    Optimizer --&gt; MixedPrecision</span><br><span class="line">    Optimizer --&gt; GradAccum</span><br><span class="line">    TrainingLoop --&gt; ParamScheduler</span><br><span class="line">    </span><br><span class="line">    TensorParallel --&gt; ParallelState</span><br><span class="line">    PipelineParallel --&gt; ParallelState</span><br><span class="line">    DataParallel --&gt; ParallelState</span><br><span class="line">    ExpertParallel --&gt; ParallelState</span><br><span class="line">    ParallelState --&gt; ProcessGroups</span><br><span class="line">    </span><br><span class="line">    ParallelState --&gt; Memory</span><br><span class="line">    TrainingLoop --&gt; Timers</span><br><span class="line">    </span><br><span class="line">    TransformerLayer --&gt; TE</span><br><span class="line">    ParallelState --&gt; NCCL</span><br><span class="line">    Optimizer --&gt; PyTorch</span><br><span class="line">    MixedPrecision --&gt; Apex</span><br><span class="line">    </span><br><span class="line">    style GPT fill:#FF6B6B</span><br><span class="line">    style TransformerBlock fill:#4ECDC4</span><br><span class="line">    style TensorParallel fill:#95E1D3</span><br><span class="line">    style PipelineParallel fill:#95E1D3</span><br><span class="line">    style Optimizer fill:#FFD93D</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="3-核心模块分析"><a href="#3-核心模块分析" class="headerlink" title="3. 核心模块分析"></a>3. 核心模块分析</h2><h3 id="3-1-Transformer-组件"><a href="#3-1-Transformer-组件" class="headerlink" title="3.1 Transformer 组件"></a>3.1 Transformer 组件</h3><h4 id="3-1-1-TransformerConfig"><a href="#3-1-1-TransformerConfig" class="headerlink" title="3.1.1 TransformerConfig"></a>3.1.1 TransformerConfig</h4><p>配置类，管理所有 Transformer 相关的配置参数：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@dataclass</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">TransformerConfig</span>(<span class="title class_ inherited__">ModelParallelConfig</span>):</span><br><span class="line">    <span class="comment"># 模型架构</span></span><br><span class="line">    num_layers: <span class="built_in">int</span>                        <span class="comment"># Transformer 层数</span></span><br><span class="line">    hidden_size: <span class="built_in">int</span>                       <span class="comment"># 隐藏层大小</span></span><br><span class="line">    num_attention_heads: <span class="built_in">int</span>               <span class="comment"># 注意力头数</span></span><br><span class="line">    ffn_hidden_size: <span class="type">Optional</span>[<span class="built_in">int</span>]         <span class="comment"># FFN 隐藏层大小</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 并行配置</span></span><br><span class="line">    tensor_model_parallel_size: <span class="built_in">int</span> = <span class="number">1</span>    <span class="comment"># 张量并行大小</span></span><br><span class="line">    pipeline_model_parallel_size: <span class="built_in">int</span> = <span class="number">1</span>  <span class="comment"># 流水线并行大小</span></span><br><span class="line">    expert_model_parallel_size: <span class="built_in">int</span> = <span class="number">1</span>    <span class="comment"># 专家并行大小</span></span><br><span class="line">    context_parallel_size: <span class="built_in">int</span> = <span class="number">1</span>         <span class="comment"># 上下文并行大小</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 精度配置</span></span><br><span class="line">    fp16: <span class="built_in">bool</span> = <span class="literal">False</span>                     <span class="comment"># FP16 训练</span></span><br><span class="line">    bf16: <span class="built_in">bool</span> = <span class="literal">False</span>                     <span class="comment"># BF16 训练</span></span><br><span class="line">    fp8: <span class="type">Optional</span>[<span class="built_in">str</span>] = <span class="literal">None</span>              <span class="comment"># FP8 训练</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># MoE 配置</span></span><br><span class="line">    num_moe_experts: <span class="type">Optional</span>[<span class="built_in">int</span>] = <span class="literal">None</span>  <span class="comment"># MoE 专家数</span></span><br><span class="line">    moe_router_topk: <span class="built_in">int</span> = <span class="number">2</span>               <span class="comment"># TopK 路由</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="3-1-2-TransformerLayer"><a href="#3-1-2-TransformerLayer" class="headerlink" title="3.1.2 TransformerLayer"></a>3.1.2 TransformerLayer</h4><p>基础 Transformer 层实现：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    Input[输入 Hidden States]</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Self-Attention Block&quot;</span><br><span class="line">        SelfAttn[Self-Attention]</span><br><span class="line">        Dropout1[Dropout]</span><br><span class="line">        Residual1[Residual Connection]</span><br><span class="line">        PostAttnLN[Post-Attention LayerNorm]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;MLP/MoE Block&quot;</span><br><span class="line">        MLPorMoE&#123;MLP or MoE?&#125;</span><br><span class="line">        MLP[MLP]</span><br><span class="line">        MoE[MoE Router + Experts]</span><br><span class="line">        Dropout2[Dropout]</span><br><span class="line">        Residual2[Residual Connection]</span><br><span class="line">        PostMLPLN[Post-MLP LayerNorm]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Output[输出 Hidden States]</span><br><span class="line">    </span><br><span class="line">    Input --&gt; SelfAttn</span><br><span class="line">    SelfAttn --&gt; Dropout1</span><br><span class="line">    Dropout1 --&gt; Residual1</span><br><span class="line">    Input --&gt; Residual1</span><br><span class="line">    Residual1 --&gt; PostAttnLN</span><br><span class="line">    </span><br><span class="line">    PostAttnLN --&gt; MLPorMoE</span><br><span class="line">    MLPorMoE --&gt;|标准| MLP</span><br><span class="line">    MLPorMoE --&gt;|MoE| MoE</span><br><span class="line">    MLP --&gt; Dropout2</span><br><span class="line">    MoE --&gt; Dropout2</span><br><span class="line">    Dropout2 --&gt; Residual2</span><br><span class="line">    PostAttnLN --&gt; Residual2</span><br><span class="line">    Residual2 --&gt; PostMLPLN</span><br><span class="line">    </span><br><span class="line">    PostMLPLN --&gt; Output</span><br><span class="line">    </span><br><span class="line">    style SelfAttn fill:#FFB6C1</span><br><span class="line">    style MLP fill:#98D8C8</span><br><span class="line">    style MoE fill:#F7DC6F</span><br></pre></td></tr></table></figure>
+
+<h4 id="3-1-3-Attention-机制"><a href="#3-1-3-Attention-机制" class="headerlink" title="3.1.3 Attention 机制"></a>3.1.3 Attention 机制</h4><p>支持多种注意力实现：</p>
+<ul>
+<li><strong>标准 Multi-Head Attention (MHA)</strong></li>
+<li><strong>Grouped Query Attention (GQA)</strong></li>
+<li><strong>Multi-Query Attention (MQA)</strong></li>
+<li><strong>Flash Attention</strong>（通过 Transformer Engine）</li>
+<li><strong>Context Parallel Attention</strong></li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 关键参数</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Attention</span>:</span><br><span class="line">    num_attention_heads: <span class="built_in">int</span>           <span class="comment"># 注意力头数</span></span><br><span class="line">    num_query_groups: <span class="built_in">int</span>              <span class="comment"># 查询组数（GQA）</span></span><br><span class="line">    kv_channels: <span class="built_in">int</span>                   <span class="comment"># K/V 通道数</span></span><br><span class="line">    attention_dropout: <span class="built_in">float</span>           <span class="comment"># Dropout 概率</span></span><br><span class="line">    attn_mask_type: AttnMaskType       <span class="comment"># 掩码类型</span></span><br><span class="line">    qkv_format: <span class="built_in">str</span>                    <span class="comment"># QKV 格式（sbhd/bshd等）</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="3-2-模型实现"><a href="#3-2-模型实现" class="headerlink" title="3.2 模型实现"></a>3.2 模型实现</h3><h4 id="3-2-1-GPTModel-架构"><a href="#3-2-1-GPTModel-架构" class="headerlink" title="3.2.1 GPTModel 架构"></a>3.2.1 GPTModel 架构</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;GPTModel&quot;</span><br><span class="line">        subgraph &quot;Pre-Process 预处理阶段&quot;</span><br><span class="line">            TokenEmbed[Token Embedding&lt;br/&gt;词嵌入层]</span><br><span class="line">            PosEmbed[Position Embedding&lt;br/&gt;位置编码]</span><br><span class="line">            EmbedDropout[Embedding Dropout]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;Encoder 编码器&quot;</span><br><span class="line">            TransBlock[TransformerBlock&lt;br/&gt;N层Transformer]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;Post-Process 后处理阶段&quot;</span><br><span class="line">            FinalLN[Final LayerNorm]</span><br><span class="line">            OutputLayer[Output Layer&lt;br/&gt;输出投影层]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;Optional 可选组件&quot;</span><br><span class="line">            MTP[Multi-Token Prediction&lt;br/&gt;多标记预测]</span><br><span class="line">        end</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Input[Input Token IDs] --&gt; TokenEmbed</span><br><span class="line">    Input --&gt; PosEmbed</span><br><span class="line">    TokenEmbed --&gt; EmbedDropout</span><br><span class="line">    PosEmbed --&gt; EmbedDropout</span><br><span class="line">    EmbedDropout --&gt; TransBlock</span><br><span class="line">    TransBlock --&gt; FinalLN</span><br><span class="line">    FinalLN --&gt; OutputLayer</span><br><span class="line">    OutputLayer --&gt; Logits[Logits]</span><br><span class="line">    </span><br><span class="line">    FinalLN -.可选.-&gt; MTP</span><br><span class="line">    MTP -.-&gt; MTPLogits[MTP Logits]</span><br><span class="line">    </span><br><span class="line">    style TransBlock fill:#4CAF50</span><br><span class="line">    style MTP fill:#FF9800</span><br></pre></td></tr></table></figure>
+
+<h4 id="3-2-2-支持的模型类型"><a href="#3-2-2-支持的模型类型" class="headerlink" title="3.2.2 支持的模型类型"></a>3.2.2 支持的模型类型</h4><table>
+<thead>
+<tr>
+<th>模型类型</th>
+<th>实现位置</th>
+<th>特性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GPT</td>
+<td><code>megatron/core/models/gpt/</code></td>
+<td>自回归语言模型，因果注意力</td>
+</tr>
+<tr>
+<td>BERT</td>
+<td><code>megatron/core/models/bert/</code></td>
+<td>双向编码器，MLM训练</td>
+</tr>
+<tr>
+<td>T5</td>
+<td><code>megatron/core/models/T5/</code></td>
+<td>编码器-解码器架构</td>
+</tr>
+<tr>
+<td>Mamba</td>
+<td><code>megatron/core/models/mamba/</code></td>
+<td>状态空间模型（SSM）</td>
+</tr>
+<tr>
+<td>Multimodal</td>
+<td><code>megatron/core/models/multimodal/</code></td>
+<td>多模态模型（LLaVA、MiMo、NVLM）</td>
+</tr>
+<tr>
+<td>RETRO</td>
+<td><code>megatron/core/models/retro/</code></td>
+<td>检索增强模型</td>
+</tr>
+<tr>
+<td>Vision</td>
+<td><code>megatron/core/models/vision/</code></td>
+<td>视觉模型（CLIP、RADIO、ViT）</td>
+</tr>
+<tr>
+<td>MiMo</td>
+<td><code>megatron/core/models/mimo/</code></td>
+<td>多图像多输出视频VLM</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="4-并行策略详解"><a href="#4-并行策略详解" class="headerlink" title="4. 并行策略详解"></a>4. 并行策略详解</h2><h3 id="4-1-并行策略概览"><a href="#4-1-并行策略概览" class="headerlink" title="4.1 并行策略概览"></a>4.1 并行策略概览</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    subgraph &quot;并行维度&quot;</span><br><span class="line">        DP[Data Parallel&lt;br/&gt;数据并行&lt;br/&gt;复制模型]</span><br><span class="line">        TP[Tensor Parallel&lt;br/&gt;张量并行&lt;br/&gt;切分层内张量]</span><br><span class="line">        PP[Pipeline Parallel&lt;br/&gt;流水线并行&lt;br/&gt;切分层间]</span><br><span class="line">        EP[Expert Parallel&lt;br/&gt;专家并行&lt;br/&gt;切分MoE专家]</span><br><span class="line">        CP[Context Parallel&lt;br/&gt;上下文并行&lt;br/&gt;切分序列]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Model[完整模型] --&gt; DP</span><br><span class="line">    Model --&gt; TP</span><br><span class="line">    Model --&gt; PP</span><br><span class="line">    Model --&gt; EP</span><br><span class="line">    Model --&gt; CP</span><br><span class="line">    </span><br><span class="line">    DP --&gt;|组合| Hybrid[混合并行策略]</span><br><span class="line">    TP --&gt;|组合| Hybrid</span><br><span class="line">    PP --&gt;|组合| Hybrid</span><br><span class="line">    EP --&gt;|组合| Hybrid</span><br><span class="line">    CP --&gt;|组合| Hybrid</span><br><span class="line">    </span><br><span class="line">    style DP fill:#FFE66D</span><br><span class="line">    style TP fill:#4ECDC4</span><br><span class="line">    style PP fill:#FF6B6B</span><br><span class="line">    style EP fill:#95E1D3</span><br><span class="line">    style CP fill:#C7CEEA</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-Tensor-Parallel（张量并行）"><a href="#4-2-Tensor-Parallel（张量并行）" class="headerlink" title="4.2 Tensor Parallel（张量并行）"></a>4.2 Tensor Parallel（张量并行）</h3><p><strong>原理</strong>: 在层内切分张量（权重矩阵和激活），不同 GPU 计算不同部分</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;Column Parallel 列并行&quot;</span><br><span class="line">        Input1[Input&lt;br/&gt;Shape: [s, b, h]]</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;GPU 0&quot;</span><br><span class="line">            Weight1_0[W1[:, 0:h/2]]</span><br><span class="line">            Output1_0[Output[:, :, 0:h/2]]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;GPU 1&quot;</span><br><span class="line">            Weight1_1[W1[:, h/2:h]]</span><br><span class="line">            Output1_1[Output[:, :, h/2:h]]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        AllGather1[All-Gather&lt;br/&gt;合并输出]</span><br><span class="line">        ConcatOutput1[Concatenated Output]</span><br><span class="line">        </span><br><span class="line">        Input1 --&gt; Weight1_0</span><br><span class="line">        Input1 --&gt; Weight1_1</span><br><span class="line">        Weight1_0 --&gt; Output1_0</span><br><span class="line">        Weight1_1 --&gt; Output1_1</span><br><span class="line">        Output1_0 --&gt; AllGather1</span><br><span class="line">        Output1_1 --&gt; AllGather1</span><br><span class="line">        AllGather1 --&gt; ConcatOutput1</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Row Parallel 行并行&quot;</span><br><span class="line">        Input2[Input&lt;br/&gt;Shape: [s, b, h]]</span><br><span class="line">        Split[Split 输入]</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;GPU 0 &quot;</span><br><span class="line">            Input2_0[Input[:, :, 0:h/2]]</span><br><span class="line">            Weight2_0[W2[0:h/2, :]]</span><br><span class="line">            Output2_0[Partial Output]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;GPU 1 &quot;</span><br><span class="line">            Input2_1[Input[:, :, h/2:h]]</span><br><span class="line">            Weight2_1[W2[h/2:h, :]]</span><br><span class="line">            Output2_1[Partial Output]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        AllReduce2[All-Reduce&lt;br/&gt;求和]</span><br><span class="line">        FinalOutput2[Final Output]</span><br><span class="line">        </span><br><span class="line">        Input2 --&gt; Split</span><br><span class="line">        Split --&gt; Input2_0</span><br><span class="line">        Split --&gt; Input2_1</span><br><span class="line">        Input2_0 --&gt; Weight2_0</span><br><span class="line">        Input2_1 --&gt; Weight2_1</span><br><span class="line">        Weight2_0 --&gt; Output2_0</span><br><span class="line">        Weight2_1 --&gt; Output2_1</span><br><span class="line">        Output2_0 --&gt; AllReduce2</span><br><span class="line">        Output2_1 --&gt; AllReduce2</span><br><span class="line">        AllReduce2 --&gt; FinalOutput2</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    style Weight1_0 fill:#FFB6C1</span><br><span class="line">    style Weight1_1 fill:#FFB6C1</span><br><span class="line">    style Weight2_0 fill:#98D8C8</span><br><span class="line">    style Weight2_1 fill:#98D8C8</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心组件</strong>:</p>
+<ul>
+<li><code>ColumnParallelLinear</code>: 列并行线性层</li>
+<li><code>RowParallelLinear</code>: 行并行线性层</li>
+<li><code>VocabParallelEmbedding</code>: 词表并行嵌入层</li>
+</ul>
+<p><strong>通信模式</strong>:</p>
+<ul>
+<li>All-Gather: 收集所有 GPU 的输出</li>
+<li>All-Reduce: 对所有 GPU 的输出求和</li>
+</ul>
+<h3 id="4-3-Pipeline-Parallel（流水线并行）"><a href="#4-3-Pipeline-Parallel（流水线并行）" class="headerlink" title="4.3 Pipeline Parallel（流水线并行）"></a>4.3 Pipeline Parallel（流水线并行）</h3><p><strong>原理</strong>: 将模型按层切分到不同 GPU，采用流水线调度策略</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line">gantt</span><br><span class="line">    title 1F1B Pipeline Schedule</span><br><span class="line">    dateFormat X</span><br><span class="line">    axisFormat %s</span><br><span class="line">    </span><br><span class="line">    section GPU-0</span><br><span class="line">    F1 : 0, 1</span><br><span class="line">    F2 : 1, 2</span><br><span class="line">    F3 : 2, 3</span><br><span class="line">    F4 : 3, 4</span><br><span class="line">    B1 : 4, 5</span><br><span class="line">    B2 : 5, 6</span><br><span class="line">    B3 : 6, 7</span><br><span class="line">    B4 : 7, 8</span><br><span class="line">    </span><br><span class="line">    section GPU-1</span><br><span class="line">    Idle : 0, 1</span><br><span class="line">    F1  : 1, 2</span><br><span class="line">    F2  : 2, 3</span><br><span class="line">    F3  : 3, 4</span><br><span class="line">    B1  : 4, 5</span><br><span class="line">    B2  : 5, 6</span><br><span class="line">    B3  : 6, 7</span><br><span class="line">    B4  : 7, 8</span><br><span class="line">    </span><br><span class="line">    section GPU-2</span><br><span class="line">    Idle : 0, 2</span><br><span class="line">    F1   : 2, 3</span><br><span class="line">    F2   : 3, 4</span><br><span class="line">    F3   : 4, 5</span><br><span class="line">    B1   : 5, 6</span><br><span class="line">    B2   : 6, 7</span><br><span class="line">    B3   : 7, 8</span><br><span class="line">    </span><br><span class="line">    section GPU-3</span><br><span class="line">    Idle : 0, 3</span><br><span class="line">    F1   : 3, 4</span><br><span class="line">    F2   : 4, 5</span><br><span class="line">    F3   : 5, 6</span><br><span class="line">    F4   : 6, 7</span><br><span class="line">    B1   : 7, 8</span><br></pre></td></tr></table></figure>
+
+<p><strong>说明</strong>:</p>
+<ul>
+<li><strong>F1-F4</strong>: 前向传播（Forward pass）批次1-4</li>
+<li><strong>B1-B4</strong>: 反向传播（Backward pass）批次1-4</li>
+<li><strong>Idle</strong>: 空闲等待</li>
+<li><strong>GPU-0</strong>: 处理 Layer 0-7</li>
+<li><strong>GPU-1</strong>: 处理 Layer 8-15</li>
+<li><strong>GPU-2</strong>: 处理 Layer 16-23</li>
+<li><strong>GPU-3</strong>: 处理 Layer 24-31</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">**调度策略**:</span><br><span class="line">- **1F1B (1-Forward-1-Backward)**: 交替执行前向和反向传播</span><br><span class="line">- **Interleaved 1F1B**: 虚拟流水线并行，减少气泡</span><br><span class="line">- **Combined 1F1B**: 结合数据并行和流水线并行</span><br><span class="line"></span><br><span class="line">**核心文件**:</span><br><span class="line">- `pipeline_parallel/schedules.py`: 调度算法实现</span><br><span class="line">- `pipeline_parallel/p2p_communication.py`: 点对点通信</span><br><span class="line"></span><br><span class="line">### 4.4 Data Parallel（数据并行）</span><br><span class="line"></span><br><span class="line">**原理**: 复制模型到多个 GPU，每个 GPU 处理不同的数据批次</span><br><span class="line"></span><br><span class="line">**实现方式**:</span><br><span class="line">1. **DDP (DistributedDataParallel)**: PyTorch 原生 DDP</span><br><span class="line">2. **FSDP (Fully Sharded Data Parallel)**: 全分片数据并行</span><br><span class="line">3. **ZeRO**: 分片优化器状态</span><br><span class="line"></span><br><span class="line">```python</span><br><span class="line"># DDP 配置</span><br><span class="line">ddp_config = DistributedDataParallelConfig(</span><br><span class="line">    grad_reduce_in_fp32=True,                # FP32 梯度规约</span><br><span class="line">    overlap_grad_reduce=True,                 # 重叠梯度通信</span><br><span class="line">    use_distributed_optimizer=True,           # 分布式优化器</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-5-Expert-Parallel（专家并行）"><a href="#4-5-Expert-Parallel（专家并行）" class="headerlink" title="4.5 Expert Parallel（专家并行）"></a>4.5 Expert Parallel（专家并行）</h3><p><strong>原理</strong>: 在 MoE 模型中，将专家分布到不同 GPU</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    Input[输入 Tokens]</span><br><span class="line">    Router[Router 路由器]</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;GPU 0&quot;</span><br><span class="line">        Expert0[Expert 0]</span><br><span class="line">        Expert1[Expert 1]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;GPU 1&quot;</span><br><span class="line">        Expert2[Expert 2]</span><br><span class="line">        Expert3[Expert 3]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;GPU 2&quot;</span><br><span class="line">        Expert4[Expert 4]</span><br><span class="line">        Expert5[Expert 5]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    AllToAll1[All-to-All&lt;br/&gt;Token 分发]</span><br><span class="line">    AllToAll2[All-to-All&lt;br/&gt;结果收集]</span><br><span class="line">    Output[输出]</span><br><span class="line">    </span><br><span class="line">    Input --&gt; Router</span><br><span class="line">    Router --&gt; AllToAll1</span><br><span class="line">    AllToAll1 --&gt; Expert0</span><br><span class="line">    AllToAll1 --&gt; Expert1</span><br><span class="line">    AllToAll1 --&gt; Expert2</span><br><span class="line">    AllToAll1 --&gt; Expert3</span><br><span class="line">    AllToAll1 --&gt; Expert4</span><br><span class="line">    AllToAll1 --&gt; Expert5</span><br><span class="line">    </span><br><span class="line">    Expert0 --&gt; AllToAll2</span><br><span class="line">    Expert1 --&gt; AllToAll2</span><br><span class="line">    Expert2 --&gt; AllToAll2</span><br><span class="line">    Expert3 --&gt; AllToAll2</span><br><span class="line">    Expert4 --&gt; AllToAll2</span><br><span class="line">    Expert5 --&gt; AllToAll2</span><br><span class="line">    </span><br><span class="line">    AllToAll2 --&gt; Output</span><br><span class="line">    </span><br><span class="line">    style Router fill:#F39C12</span><br><span class="line">    style Expert0 fill:#3498DB</span><br><span class="line">    style Expert1 fill:#3498DB</span><br><span class="line">    style Expert2 fill:#E74C3C</span><br><span class="line">    style Expert3 fill:#E74C3C</span><br><span class="line">    style Expert4 fill:#2ECC71</span><br><span class="line">    style Expert5 fill:#2ECC71</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键特性</strong>:</p>
+<ul>
+<li>TopK 路由选择</li>
+<li>负载均衡损失</li>
+<li>Token Dropping</li>
+<li>专家容量因子</li>
+</ul>
+<h3 id="4-6-Context-Parallel（上下文并行）"><a href="#4-6-Context-Parallel（上下文并行）" class="headerlink" title="4.6 Context Parallel（上下文并行）"></a>4.6 Context Parallel（上下文并行）</h3><p><strong>原理</strong>: 在序列维度上切分长序列，适用于超长上下文</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 序列切分示例</span></span><br><span class="line"><span class="comment"># 原始序列长度: 128K tokens</span></span><br><span class="line"><span class="comment"># Context Parallel Size: 4</span></span><br><span class="line"><span class="comment"># 每个 GPU 处理: 32K tokens</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># GPU 0: tokens[0:32K]</span></span><br><span class="line"><span class="comment"># GPU 1: tokens[32K:64K]</span></span><br><span class="line"><span class="comment"># GPU 2: tokens[64K:96K]</span></span><br><span class="line"><span class="comment"># GPU 3: tokens[96K:128K]</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>通信需求</strong>:</p>
+<ul>
+<li>All-Gather: 在注意力计算时收集 K&#x2F;V</li>
+<li>Ring Attention: 环形注意力机制</li>
+</ul>
+<h3 id="4-7-并行策略选择指南"><a href="#4-7-并行策略选择指南" class="headerlink" title="4.7 并行策略选择指南"></a>4.7 并行策略选择指南</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line">graph TD</span><br><span class="line">    Start[开始选择并行策略]</span><br><span class="line">    </span><br><span class="line">    Q1&#123;模型能否放入&lt;br/&gt;单个GPU?&#125;</span><br><span class="line">    Q2&#123;主要瓶颈是?&#125;</span><br><span class="line">    Q3&#123;是否使用MoE?&#125;</span><br><span class="line">    Q4&#123;序列长度是否&lt;br/&gt;超过32K?&#125;</span><br><span class="line">    Q5&#123;GPU数量?&#125;</span><br><span class="line">    </span><br><span class="line">    DP[数据并行&lt;br/&gt;Data Parallel]</span><br><span class="line">    TP_DP[张量并行 + 数据并行&lt;br/&gt;TP + DP]</span><br><span class="line">    PP_TP_DP[流水线 + 张量 + 数据&lt;br/&gt;PP + TP + DP]</span><br><span class="line">    EP_ADDED[添加专家并行&lt;br/&gt;+ EP]</span><br><span class="line">    CP_ADDED[添加上下文并行&lt;br/&gt;+ CP]</span><br><span class="line">    </span><br><span class="line">    Start --&gt; Q1</span><br><span class="line">    Q1 --&gt;|是| DP</span><br><span class="line">    Q1 --&gt;|否| Q2</span><br><span class="line">    </span><br><span class="line">    Q2 --&gt;|层内参数量| Q5</span><br><span class="line">    Q2 --&gt;|层数过多| PP_TP_DP</span><br><span class="line">    </span><br><span class="line">    Q5 --&gt;|2-8| TP_DP</span><br><span class="line">    Q5 --&gt;|&gt;8| PP_TP_DP</span><br><span class="line">    </span><br><span class="line">    TP_DP --&gt; Q3</span><br><span class="line">    PP_TP_DP --&gt; Q3</span><br><span class="line">    </span><br><span class="line">    Q3 --&gt;|是| EP_ADDED</span><br><span class="line">    Q3 --&gt;|否| Q4</span><br><span class="line">    EP_ADDED --&gt; Q4</span><br><span class="line">    </span><br><span class="line">    Q4 --&gt;|是| CP_ADDED</span><br><span class="line">    Q4 --&gt;|否| End[完成配置]</span><br><span class="line">    CP_ADDED --&gt; End</span><br><span class="line">    </span><br><span class="line">    style DP fill:#90EE90</span><br><span class="line">    style TP_DP fill:#87CEEB</span><br><span class="line">    style PP_TP_DP fill:#FFB6C1</span><br><span class="line">    style EP_ADDED fill:#F0E68C</span><br><span class="line">    style CP_ADDED fill:#DDA0DD</span><br></pre></td></tr></table></figure>
+
+<p><strong>经验法则</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>模型大小</th>
+<th>GPU 数量</th>
+<th>推荐策略</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&lt; 1B</td>
+<td>1-8</td>
+<td>DP only</td>
+</tr>
+<tr>
+<td>1B - 13B</td>
+<td>8-64</td>
+<td>TP&#x3D;2-4, DP&#x3D;rest</td>
+</tr>
+<tr>
+<td>13B - 70B</td>
+<td>64-256</td>
+<td>TP&#x3D;4-8, PP&#x3D;2-4, DP&#x3D;rest</td>
+</tr>
+<tr>
+<td>70B - 175B</td>
+<td>256-1024</td>
+<td>TP&#x3D;8, PP&#x3D;4-8, DP&#x3D;rest</td>
+</tr>
+<tr>
+<td>&gt; 175B</td>
+<td>&gt; 1024</td>
+<td>TP&#x3D;8, PP&#x3D;16+, DP&#x3D;rest</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="5-模型实现"><a href="#5-模型实现" class="headerlink" title="5. 模型实现"></a>5. 模型实现</h2><h3 id="5-1-模型层次结构"><a href="#5-1-模型层次结构" class="headerlink" title="5.1 模型层次结构"></a>5.1 模型层次结构</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line">classDiagram</span><br><span class="line">    class MegatronModule &#123;</span><br><span class="line">        +config: TransformerConfig</span><br><span class="line">        +shared_embedding_or_output_weight()</span><br><span class="line">        +initialize_embedding_or_output_weight()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class LanguageModule &#123;</span><br><span class="line">        +state_dict_for_save_checkpoint()</span><br><span class="line">        +load_state_dict()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class GPTModel &#123;</span><br><span class="line">        +embedding: LanguageModelEmbedding</span><br><span class="line">        +decoder: TransformerBlock</span><br><span class="line">        +output_layer: Linear</span><br><span class="line">        +forward()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class TransformerBlock &#123;</span><br><span class="line">        +num_layers: int</span><br><span class="line">        +layers: ModuleList</span><br><span class="line">        +final_layernorm: LayerNorm</span><br><span class="line">        +forward()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class TransformerLayer &#123;</span><br><span class="line">        +self_attention: Attention</span><br><span class="line">        +mlp: MLP</span><br><span class="line">        +input_layernorm: LayerNorm</span><br><span class="line">        +pre_mlp_layernorm: LayerNorm</span><br><span class="line">        +forward()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class Attention &#123;</span><br><span class="line">        +linear_qkv: ColumnParallelLinear</span><br><span class="line">        +core_attention: DotProductAttention</span><br><span class="line">        +linear_proj: RowParallelLinear</span><br><span class="line">        +forward()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class MLP &#123;</span><br><span class="line">        +linear_fc1: ColumnParallelLinear</span><br><span class="line">        +activation_func: Activation</span><br><span class="line">        +linear_fc2: RowParallelLinear</span><br><span class="line">        +forward()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    MegatronModule &lt;|-- LanguageModule</span><br><span class="line">    LanguageModule &lt;|-- GPTModel</span><br><span class="line">    MegatronModule &lt;|-- TransformerBlock</span><br><span class="line">    MegatronModule &lt;|-- TransformerLayer</span><br><span class="line">    MegatronModule &lt;|-- Attention</span><br><span class="line">    MegatronModule &lt;|-- MLP</span><br><span class="line">    </span><br><span class="line">    GPTModel *-- TransformerBlock</span><br><span class="line">    TransformerBlock *-- TransformerLayer</span><br><span class="line">    TransformerLayer *-- Attention</span><br><span class="line">    TransformerLayer *-- MLP</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-MoE（Mixture-of-Experts）实现"><a href="#5-2-MoE（Mixture-of-Experts）实现" class="headerlink" title="5.2 MoE（Mixture of Experts）实现"></a>5.2 MoE（Mixture of Experts）实现</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    Input[输入 Hidden States]</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;MoE Layer&quot;</span><br><span class="line">        SharedCheck&#123;是否有 Shared Experts?&#125;</span><br><span class="line">        SharedExperts[Shared Experts 共享专家&lt;br/&gt;所有token都计算]</span><br><span class="line">        </span><br><span class="line">        Router[TopK Router 路由器&lt;br/&gt;计算专家分数 + Aux Loss]</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;Token Dispatching&quot;</span><br><span class="line">            Dispatcher&#123;Token Dispatcher&lt;br/&gt;分发策略&#125;</span><br><span class="line">            AllGather[AllGather&lt;br/&gt;收集所有token]</span><br><span class="line">            AllToAll[AllToAll&lt;br/&gt;token重排列]</span><br><span class="line">            Flex[Flex Dispatcher&lt;br/&gt;统一TP+EP通信]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;Routed Experts 路由专家&quot;</span><br><span class="line">            E1[Expert 1]</span><br><span class="line">            E2[Expert 2]</span><br><span class="line">            EN[Expert N]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        Combine[Token Combine 合并&lt;br/&gt;加权求和专家输出]</span><br><span class="line">        MixOutput[混合输出&lt;br/&gt;Shared + Routed]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Output[输出 Hidden States]</span><br><span class="line">    </span><br><span class="line">    Input --&gt; SharedCheck</span><br><span class="line">    SharedCheck --&gt;|有| SharedExperts</span><br><span class="line">    SharedCheck --&gt;|无| Router</span><br><span class="line">    SharedExperts --&gt; Router</span><br><span class="line">    </span><br><span class="line">    Router --&gt;|routing_map + probs| Dispatcher</span><br><span class="line">    </span><br><span class="line">    Dispatcher --&gt;|All-Gather| AllGather</span><br><span class="line">    Dispatcher --&gt;|All-to-All| AllToAll</span><br><span class="line">    Dispatcher --&gt;|统一通信| Flex</span><br><span class="line">    </span><br><span class="line">    AllGather --&gt; E1</span><br><span class="line">    AllGather --&gt; E2</span><br><span class="line">    AllGather --&gt; EN</span><br><span class="line">    </span><br><span class="line">    AllToAll --&gt; E1</span><br><span class="line">    AllToAll --&gt; E2</span><br><span class="line">    AllToAll --&gt; EN</span><br><span class="line">    </span><br><span class="line">    Flex --&gt; E1</span><br><span class="line">    Flex --&gt; E2</span><br><span class="line">    Flex --&gt; EN</span><br><span class="line">    </span><br><span class="line">    E1 --&gt; Combine</span><br><span class="line">    E2 --&gt; Combine</span><br><span class="line">    EN --&gt; Combine</span><br><span class="line">    </span><br><span class="line">    Combine --&gt; MixOutput</span><br><span class="line">    SharedExperts -.-&gt; MixOutput</span><br><span class="line">    </span><br><span class="line">    MixOutput --&gt; Output</span><br><span class="line">    </span><br><span class="line">    style Router fill:#FFD93D</span><br><span class="line">    style SharedExperts fill:#FF6B6B</span><br><span class="line">    style E1 fill:#98D8C8</span><br><span class="line">    style E2 fill:#98D8C8</span><br><span class="line">    style EN fill:#98D8C8</span><br><span class="line">    style Combine fill:#F7DC6F</span><br></pre></td></tr></table></figure>
+
+<p><strong>MoE 关键参数</strong>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># MoE 配置</span></span><br><span class="line">moe_config = TransformerConfig(</span><br><span class="line">    num_moe_experts=<span class="number">64</span>,                    <span class="comment"># 专家总数</span></span><br><span class="line">    moe_router_topk=<span class="number">2</span>,                     <span class="comment"># 每个token选择的专家数</span></span><br><span class="line">    moe_aux_loss_coeff=<span class="number">0.01</span>,              <span class="comment"># 辅助损失系数</span></span><br><span class="line">    moe_token_dispatcher_type=<span class="string">&#x27;alltoall&#x27;</span>,  <span class="comment"># Token分发类型</span></span><br><span class="line">    expert_model_parallel_size=<span class="number">8</span>,          <span class="comment"># 专家并行度</span></span><br><span class="line">    moe_router_load_balancing_type=<span class="string">&#x27;aux_loss&#x27;</span>,  <span class="comment"># 负载均衡类型</span></span><br><span class="line">    moe_router_dtype=<span class="string">&#x27;fp32&#x27;</span>,               <span class="comment"># 路由器精度（推荐fp32）</span></span><br><span class="line">    moe_grouped_gemm=<span class="literal">True</span>,                 <span class="comment"># 分组GEMM优化</span></span><br><span class="line">    <span class="comment"># Shared Experts 配置（如 DeepSeek-V3）</span></span><br><span class="line">    moe_shared_expert_intermediate_size=<span class="literal">None</span>,  <span class="comment"># 共享专家FFN大小</span></span><br><span class="line">    moe_shared_expert_overlap=<span class="literal">True</span>,        <span class="comment"># 共享专家计算重叠</span></span><br><span class="line">    <span class="comment"># 负载均衡策略</span></span><br><span class="line">    moe_aux_loss_free=<span class="literal">False</span>,               <span class="comment"># 无辅助损失策略</span></span><br><span class="line">    moe_expert_capacity_factor=<span class="number">1.0</span>,        <span class="comment"># 专家容量因子</span></span><br><span class="line">    moe_pad_expert_input_to_capacity=<span class="literal">False</span>,  <span class="comment"># 填充到容量</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><strong>DeepSeek-V3 特性</strong>:</p>
+<ul>
+<li><strong>Node-limited routing</strong>: 节点限制路由</li>
+<li><strong>Device-limited routing</strong>: 设备限制路由</li>
+<li><strong>Aux-loss-free</strong>: 无辅助损失负载均衡</li>
+<li><strong>Shared Experts</strong>: 所有token都经过的共享专家层</li>
+<li><strong>Fine-grained parallelism</strong>: 细粒度并行优化</li>
+</ul>
+<h3 id="5-3-Multi-Token-Prediction-MTP"><a href="#5-3-Multi-Token-Prediction-MTP" class="headerlink" title="5.3 Multi-Token Prediction (MTP)"></a>5.3 Multi-Token Prediction (MTP)</h3><p><strong>概念</strong>: 在训练时同时预测多个未来 token，提升训练效率</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    Input[输入序列&lt;br/&gt;t1, t2, ..., tn]</span><br><span class="line">    Encoder[主编码器&lt;br/&gt;TransformerBlock]</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;MTP Block&quot;</span><br><span class="line">        MTP_Layer1[MTP Layer 1]</span><br><span class="line">        MTP_Layer2[MTP Layer 2]</span><br><span class="line">        MTP_LayerK[MTP Layer K]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Pred_t1[预测 t+1]</span><br><span class="line">    Pred_t2[预测 t+2]</span><br><span class="line">    Pred_tk[预测 t+k]</span><br><span class="line">    </span><br><span class="line">    Loss[综合损失]</span><br><span class="line">    </span><br><span class="line">    Input --&gt; Encoder</span><br><span class="line">    Encoder --&gt; MTP_Layer1</span><br><span class="line">    MTP_Layer1 --&gt; MTP_Layer2</span><br><span class="line">    MTP_Layer2 --&gt; MTP_LayerK</span><br><span class="line">    </span><br><span class="line">    Encoder --&gt; Pred_t1</span><br><span class="line">    MTP_Layer1 --&gt; Pred_t2</span><br><span class="line">    MTP_LayerK --&gt; Pred_tk</span><br><span class="line">    </span><br><span class="line">    Pred_t1 --&gt; Loss</span><br><span class="line">    Pred_t2 --&gt; Loss</span><br><span class="line">    Pred_tk --&gt; Loss</span><br><span class="line">    </span><br><span class="line">    style Encoder fill:#4CAF50</span><br><span class="line">    style MTP_Layer1 fill:#FF9800</span><br><span class="line">    style MTP_Layer2 fill:#FF9800</span><br><span class="line">    style MTP_LayerK fill:#FF9800</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="6-训练流程"><a href="#6-训练流程" class="headerlink" title="6. 训练流程"></a>6. 训练流程</h2><h3 id="6-1-训练主循环"><a href="#6-1-训练主循环" class="headerlink" title="6.1 训练主循环"></a>6.1 训练主循环</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br></pre></td><td class="code"><pre><span class="line">flowchart TD</span><br><span class="line">    Start([开始训练])</span><br><span class="line">    Init[初始化&lt;br/&gt;initialize_megatron]</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;初始化阶段&quot;</span><br><span class="line">        ParseArgs[解析命令行参数]</span><br><span class="line">        InitDist[初始化分布式环境&lt;br/&gt;parallel_state]</span><br><span class="line">        BuildModel[构建模型&lt;br/&gt;model_provider]</span><br><span class="line">        BuildOptim[构建优化器&lt;br/&gt;get_megatron_optimizer]</span><br><span class="line">        BuildData[构建数据加载器&lt;br/&gt;build_train_valid_test_datasets]</span><br><span class="line">        LoadCkpt[加载检查点&lt;br/&gt;load_checkpoint]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;训练循环&quot;</span><br><span class="line">        EpochLoop&#123;遍历 Epoch&#125;</span><br><span class="line">        BatchLoop&#123;遍历 Batch&#125;</span><br><span class="line">        </span><br><span class="line">        GetBatch[获取数据批次]</span><br><span class="line">        ForwardBackward[前向+反向传播&lt;br/&gt;forward_backward_func]</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;前向反向传播&quot;</span><br><span class="line">            Forward[前向传播]</span><br><span class="line">            ComputeLoss[计算损失]</span><br><span class="line">            Backward[反向传播]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        ReduceGrad[梯度规约&lt;br/&gt;All-Reduce]</span><br><span class="line">        ClipGrad[梯度裁剪]</span><br><span class="line">        UpdateParams[更新参数&lt;br/&gt;optimizer.step]</span><br><span class="line">        UpdateLR[更新学习率]</span><br><span class="line">        LogMetrics[记录指标]</span><br><span class="line">        </span><br><span class="line">        CheckSave&#123;是否保存?&#125;</span><br><span class="line">        SaveCkpt[保存检查点]</span><br><span class="line">        CheckEval&#123;是否评估?&#125;</span><br><span class="line">        Evaluate[评估模型]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    End([训练结束])</span><br><span class="line">    </span><br><span class="line">    Start --&gt; Init</span><br><span class="line">    Init --&gt; ParseArgs</span><br><span class="line">    ParseArgs --&gt; InitDist</span><br><span class="line">    InitDist --&gt; BuildModel</span><br><span class="line">    BuildModel --&gt; BuildOptim</span><br><span class="line">    BuildOptim --&gt; BuildData</span><br><span class="line">    BuildData --&gt; LoadCkpt</span><br><span class="line">    </span><br><span class="line">    LoadCkpt --&gt; EpochLoop</span><br><span class="line">    EpochLoop --&gt;|继续| BatchLoop</span><br><span class="line">    EpochLoop --&gt;|完成| End</span><br><span class="line">    </span><br><span class="line">    BatchLoop --&gt;|继续| GetBatch</span><br><span class="line">    BatchLoop --&gt;|完成| EpochLoop</span><br><span class="line">    </span><br><span class="line">    GetBatch --&gt; ForwardBackward</span><br><span class="line">    ForwardBackward --&gt; Forward</span><br><span class="line">    Forward --&gt; ComputeLoss</span><br><span class="line">    ComputeLoss --&gt; Backward</span><br><span class="line">    </span><br><span class="line">    Backward --&gt; ReduceGrad</span><br><span class="line">    ReduceGrad --&gt; ClipGrad</span><br><span class="line">    ClipGrad --&gt; UpdateParams</span><br><span class="line">    UpdateParams --&gt; UpdateLR</span><br><span class="line">    UpdateLR --&gt; LogMetrics</span><br><span class="line">    </span><br><span class="line">    LogMetrics --&gt; CheckSave</span><br><span class="line">    CheckSave --&gt;|是| SaveCkpt</span><br><span class="line">    CheckSave --&gt;|否| CheckEval</span><br><span class="line">    SaveCkpt --&gt; CheckEval</span><br><span class="line">    </span><br><span class="line">    CheckEval --&gt;|是| Evaluate</span><br><span class="line">    CheckEval --&gt;|否| BatchLoop</span><br><span class="line">    Evaluate --&gt; BatchLoop</span><br><span class="line">    </span><br><span class="line">    style Init fill:#90EE90</span><br><span class="line">    style ForwardBackward fill:#FFB6C1</span><br><span class="line">    style UpdateParams fill:#87CEEB</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-2-混合精度训练流程"><a href="#6-2-混合精度训练流程" class="headerlink" title="6.2 混合精度训练流程"></a>6.2 混合精度训练流程</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    Input[FP32/BF16 输入]</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;前向传播&quot;</span><br><span class="line">        Cast1[转换为 FP16/BF16/FP8]</span><br><span class="line">        Compute1[模型计算&lt;br/&gt;低精度]</span><br><span class="line">        Loss[计算损失&lt;br/&gt;FP32]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;反向传播&quot;</span><br><span class="line">        ScaleLoss[损失缩放&lt;br/&gt;Loss Scaling]</span><br><span class="line">        Backward[反向传播&lt;br/&gt;低精度梯度]</span><br><span class="line">        Unscale[反缩放梯度]</span><br><span class="line">        CheckOverflow&#123;检查溢出?&#125;</span><br><span class="line">        Cast2[转换为 FP32]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;优化器&quot;</span><br><span class="line">        ClipGrad[梯度裁剪&lt;br/&gt;FP32]</span><br><span class="line">        Update[参数更新&lt;br/&gt;FP32]</span><br><span class="line">        UpdateScale[更新Loss Scale]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Output[更新后的参数]</span><br><span class="line">    </span><br><span class="line">    Input --&gt; Cast1</span><br><span class="line">    Cast1 --&gt; Compute1</span><br><span class="line">    Compute1 --&gt; Loss</span><br><span class="line">    </span><br><span class="line">    Loss --&gt; ScaleLoss</span><br><span class="line">    ScaleLoss --&gt; Backward</span><br><span class="line">    Backward --&gt; Unscale</span><br><span class="line">    Unscale --&gt; CheckOverflow</span><br><span class="line">    </span><br><span class="line">    CheckOverflow --&gt;|溢出| UpdateScale</span><br><span class="line">    CheckOverflow --&gt;|正常| Cast2</span><br><span class="line">    UpdateScale --&gt; SkipStep[跳过更新]</span><br><span class="line">    </span><br><span class="line">    Cast2 --&gt; ClipGrad</span><br><span class="line">    ClipGrad --&gt; Update</span><br><span class="line">    Update --&gt; Output</span><br><span class="line">    </span><br><span class="line">    style Compute1 fill:#FFE66D</span><br><span class="line">    style Backward fill:#FF6B6B</span><br><span class="line">    style Update fill:#4ECDC4</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="7-关键技术特性"><a href="#7-关键技术特性" class="headerlink" title="7. 关键技术特性"></a>7. 关键技术特性</h2><h3 id="7-1-FP8-训练"><a href="#7-1-FP8-训练" class="headerlink" title="7.1 FP8 训练"></a>7.1 FP8 训练</h3><p><strong>Transformer Engine 集成</strong>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># FP8 配置</span></span><br><span class="line">config = TransformerConfig(</span><br><span class="line">    fp8=<span class="string">&#x27;hybrid&#x27;</span>,                    <span class="comment"># FP8 模式: hybrid/e4m3/e5m2</span></span><br><span class="line">    fp8_margin=<span class="number">0</span>,                    <span class="comment"># FP8 边界</span></span><br><span class="line">    fp8_interval=<span class="number">1</span>,                  <span class="comment"># 缩放因子更新间隔</span></span><br><span class="line">    fp8_amax_history_len=<span class="number">1024</span>,       <span class="comment"># 历史最大值长度</span></span><br><span class="line">    fp8_amax_compute_algo=<span class="string">&#x27;max&#x27;</span>,     <span class="comment"># 计算算法</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><strong>精度对比</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>精度类型</th>
+<th>指数位</th>
+<th>尾数位</th>
+<th>动态范围</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FP32</td>
+<td>8</td>
+<td>23</td>
+<td>10^38</td>
+<td>基准</td>
+</tr>
+<tr>
+<td>FP16</td>
+<td>5</td>
+<td>10</td>
+<td>10^4</td>
+<td>通用训练</td>
+</tr>
+<tr>
+<td>BF16</td>
+<td>8</td>
+<td>7</td>
+<td>10^38</td>
+<td>稳定训练</td>
+</tr>
+<tr>
+<td>FP8 E4M3</td>
+<td>4</td>
+<td>3</td>
+<td>10^2</td>
+<td>前向传播</td>
+</tr>
+<tr>
+<td>FP8 E5M2</td>
+<td>5</td>
+<td>2</td>
+<td>10^4</td>
+<td>反向传播</td>
+</tr>
+</tbody></table>
+<h3 id="7-2-序列并行（Sequence-Parallel）"><a href="#7-2-序列并行（Sequence-Parallel）" class="headerlink" title="7.2 序列并行（Sequence Parallel）"></a>7.2 序列并行（Sequence Parallel）</h3><p><strong>与张量并行结合</strong>:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    subgraph &quot;标准 Tensor Parallel&quot;</span><br><span class="line">        Input1[Input&lt;br/&gt;复制到所有GPU]</span><br><span class="line">        TP1[TP Computation]</span><br><span class="line">        Output1[Output&lt;br/&gt;All-Reduce]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Sequence Parallel&quot;</span><br><span class="line">        Input2[Input&lt;br/&gt;切分序列维度]</span><br><span class="line">        TP2[TP Computation&lt;br/&gt;每个GPU处理部分序列]</span><br><span class="line">        Output2[Output&lt;br/&gt;All-Gather]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Input1 --&gt; TP1</span><br><span class="line">    TP1 --&gt; Output1</span><br><span class="line">    </span><br><span class="line">    Input2 --&gt; TP2</span><br><span class="line">    TP2 --&gt; Output2</span><br><span class="line">    </span><br><span class="line">    style Input2 fill:#90EE90</span><br><span class="line">    style TP2 fill:#FFB6C1</span><br></pre></td></tr></table></figure>
+
+<p><strong>优势</strong>:</p>
+<ul>
+<li>减少激活内存占用</li>
+<li>降低通信量</li>
+<li>更好的扩展性</li>
+</ul>
+<h3 id="7-3-重计算（Activation-Recomputation）"><a href="#7-3-重计算（Activation-Recomputation）" class="headerlink" title="7.3 重计算（Activation Recomputation）"></a>7.3 重计算（Activation Recomputation）</h3><p><strong>策略</strong>:</p>
+<ol>
+<li><strong>Full Recomputation</strong>: 重计算所有激活</li>
+<li><strong>Selective Recomputation</strong>: 仅重计算部分层</li>
+<li><strong>Partial Recomputation</strong>: 重计算注意力层</li>
+</ol>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 配置重计算</span></span><br><span class="line">config = TransformerConfig(</span><br><span class="line">    recompute_granularity=<span class="string">&#x27;selective&#x27;</span>,  <span class="comment"># full/selective/partial</span></span><br><span class="line">    recompute_method=<span class="string">&#x27;uniform&#x27;</span>,         <span class="comment"># uniform/block</span></span><br><span class="line">    recompute_num_layers=<span class="number">1</span>,            <span class="comment"># 重计算层数</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-4-分布式优化器"><a href="#7-4-分布式优化器" class="headerlink" title="7.4 分布式优化器"></a>7.4 分布式优化器</h3><p><strong>特性</strong>:</p>
+<ul>
+<li>分片优化器状态（类似 ZeRO-1）</li>
+<li>重叠通信和计算</li>
+<li>支持梯度累积</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 分布式优化器配置</span></span><br><span class="line">optimizer_config = OptimizerConfig(</span><br><span class="line">    optimizer=<span class="string">&#x27;adam&#x27;</span>,</span><br><span class="line">    lr=<span class="number">1e-4</span>,</span><br><span class="line">    weight_decay=<span class="number">0.1</span>,</span><br><span class="line">    adam_beta1=<span class="number">0.9</span>,</span><br><span class="line">    adam_beta2=<span class="number">0.999</span>,</span><br><span class="line">    use_distributed_optimizer=<span class="literal">True</span>,</span><br><span class="line">    overlap_grad_reduce=<span class="literal">True</span>,</span><br><span class="line">    overlap_param_gather=<span class="literal">True</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-5-Flash-Attention"><a href="#7-5-Flash-Attention" class="headerlink" title="7.5 Flash Attention"></a>7.5 Flash Attention</h3><p>通过 Transformer Engine 集成：</p>
+<p><strong>优势</strong>:</p>
+<ul>
+<li>降低 HBM 访问</li>
+<li>O(N) 内存复杂度</li>
+<li>2-4倍加速</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 启用 Flash Attention</span></span><br><span class="line">config = TransformerConfig(</span><br><span class="line">    attention_backend=<span class="string">&#x27;flash&#x27;</span>,  <span class="comment"># transformer_engine/torch</span></span><br><span class="line">    attention_dropout=<span class="number">0.0</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-6-Multi-Latent-Attention-MLA"><a href="#7-6-Multi-Latent-Attention-MLA" class="headerlink" title="7.6 Multi-Latent Attention (MLA)"></a>7.6 Multi-Latent Attention (MLA)</h3><p><strong>概念</strong>: DeepSeek-V3 引入的高效注意力机制，通过潜在压缩降低KV Cache内存</p>
+<p><strong>架构特点</strong>:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    Input[输入 Hidden States]</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;MLA Layer&quot;</span><br><span class="line">        QProj[Q Projection]</span><br><span class="line">        QDown[Q Down Projection&lt;br/&gt;降维到潜在空间]</span><br><span class="line">        QUp[Q Up Projection&lt;br/&gt;升维]</span><br><span class="line">        </span><br><span class="line">        KVDown[KV Down Projection&lt;br/&gt;共享压缩]</span><br><span class="line">        KVUp[KV Up Projection&lt;br/&gt;分离K和V]</span><br><span class="line">        </span><br><span class="line">        RoPE[Rotary Position&lt;br/&gt;Embedding]</span><br><span class="line">        Attn[Attention&lt;br/&gt;Computation]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Output[输出]</span><br><span class="line">    </span><br><span class="line">    Input --&gt; QProj</span><br><span class="line">    QProj --&gt; QDown</span><br><span class="line">    QDown --&gt; QUp</span><br><span class="line">    QUp --&gt; RoPE</span><br><span class="line">    </span><br><span class="line">    Input --&gt; KVDown</span><br><span class="line">    KVDown --&gt; KVUp</span><br><span class="line">    KVUp --&gt; RoPE</span><br><span class="line">    </span><br><span class="line">    RoPE --&gt; Attn</span><br><span class="line">    Attn --&gt; Output</span><br><span class="line">    </span><br><span class="line">    style KVDown fill:#FFB6C1</span><br><span class="line">    style QDown fill:#98D8C8</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键优势</strong>:</p>
+<ul>
+<li><strong>内存效率</strong>: KV Cache 内存降低 75%+</li>
+<li><strong>计算效率</strong>: 减少注意力计算复杂度</li>
+<li><strong>长序列支持</strong>: 支持更长的上下文窗口</li>
+</ul>
+<p><strong>配置示例</strong>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># MLA 配置</span></span><br><span class="line">mla_config = MLATransformerConfig(</span><br><span class="line">    <span class="comment"># 基础配置</span></span><br><span class="line">    hidden_size=<span class="number">5120</span>,</span><br><span class="line">    num_attention_heads=<span class="number">128</span>,</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># MLA 特定配置</span></span><br><span class="line">    q_lora_rank=<span class="number">1536</span>,              <span class="comment"># Q的LoRA秩</span></span><br><span class="line">    kv_lora_rank=<span class="number">512</span>,              <span class="comment"># KV的LoRA秩</span></span><br><span class="line">    qk_rope_head_dim=<span class="number">64</span>,           <span class="comment"># RoPE维度</span></span><br><span class="line">    v_head_dim=<span class="number">128</span>,                <span class="comment"># V头维度</span></span><br><span class="line">    qk_nope_head_dim=<span class="number">128</span>,          <span class="comment"># 非RoPE部分维度</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 优化选项</span></span><br><span class="line">    use_fused_rope=<span class="literal">True</span>,           <span class="comment"># 融合RoPE算子</span></span><br><span class="line">    cache_kv_in_compressed_form=<span class="literal">True</span>,  <span class="comment"># 缓存压缩形式的KV</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-7-HyperCommGrid"><a href="#7-7-HyperCommGrid" class="headerlink" title="7.7 HyperCommGrid"></a>7.7 HyperCommGrid</h3><p><strong>概念</strong>: N维通信网格，灵活管理多种并行策略的进程组</p>
+<p><strong>特点</strong>:</p>
+<ul>
+<li>支持任意维度的并行组合</li>
+<li>动态创建进程组</li>
+<li>避免重复创建相同维度组合</li>
+</ul>
+<p><strong>使用示例</strong>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> megatron.core.hyper_comm_grid <span class="keyword">import</span> HyperCommGrid</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建4维并行网格: DP x TP x PP x EP</span></span><br><span class="line">grid = HyperCommGrid(</span><br><span class="line">    dim_names=[<span class="string">&#x27;dp&#x27;</span>, <span class="string">&#x27;tp&#x27;</span>, <span class="string">&#x27;pp&#x27;</span>, <span class="string">&#x27;ep&#x27;</span>],</span><br><span class="line">    dim_sizes=[<span class="number">8</span>, <span class="number">4</span>, <span class="number">2</span>, <span class="number">4</span>],</span><br><span class="line">    world_size=<span class="number">256</span>,</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建特定维度的进程组</span></span><br><span class="line">grid.create_pg([<span class="string">&#x27;tp&#x27;</span>, <span class="string">&#x27;pp&#x27;</span>])  <span class="comment"># TP+PP 组合</span></span><br><span class="line">grid.create_pg([<span class="string">&#x27;dp&#x27;</span>, <span class="string">&#x27;ep&#x27;</span>])  <span class="comment"># DP+EP 组合</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 获取进程组</span></span><br><span class="line">tp_pp_group = grid.get_pg([<span class="string">&#x27;tp&#x27;</span>, <span class="string">&#x27;pp&#x27;</span>])</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-8-动态推理引擎"><a href="#7-8-动态推理引擎" class="headerlink" title="7.8 动态推理引擎"></a>7.8 动态推理引擎</h3><p><strong>特性</strong>:</p>
+<ul>
+<li><strong>In-flight Batching</strong>: 动态批处理，提升吞吐量</li>
+<li><strong>Chunked KV Cache</strong>: 分块KV缓存管理</li>
+<li><strong>Multi-batch CUDA Graphs</strong>: 多批次CUDA图优化</li>
+<li><strong>Async Support</strong>: 异步推理支持</li>
+</ul>
+<p><strong>推理引擎架构</strong>:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    Client[推理客户端]</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;推理引擎&quot;</span><br><span class="line">        Scheduler[调度器&lt;br/&gt;Scheduler]</span><br><span class="line">        Coordinator[协调器&lt;br/&gt;DP Coordinator]</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;执行层&quot;</span><br><span class="line">            Engine1[推理引擎 GPU-0]</span><br><span class="line">            Engine2[推理引擎 GPU-1]</span><br><span class="line">            EngineN[推理引擎 GPU-N]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        KVCache[KV Cache 管理器]</span><br><span class="line">        BatchManager[批处理管理器]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Client --&gt; Scheduler</span><br><span class="line">    Scheduler --&gt; Coordinator</span><br><span class="line">    Coordinator --&gt; Engine1</span><br><span class="line">    Coordinator --&gt; Engine2</span><br><span class="line">    Coordinator --&gt; EngineN</span><br><span class="line">    </span><br><span class="line">    Engine1 --&gt; KVCache</span><br><span class="line">    Engine2 --&gt; KVCache</span><br><span class="line">    EngineN --&gt; KVCache</span><br><span class="line">    </span><br><span class="line">    Scheduler --&gt; BatchManager</span><br><span class="line">    </span><br><span class="line">    style Scheduler fill:#4CAF50</span><br><span class="line">    style KVCache fill:#FF9800</span><br></pre></td></tr></table></figure>
+
+<p><strong>使用示例</strong>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> megatron.core.inference <span class="keyword">import</span> DynamicInferenceEngine</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建推理引擎</span></span><br><span class="line">engine = DynamicInferenceEngine(</span><br><span class="line">    model=model,</span><br><span class="line">    tokenizer=tokenizer,</span><br><span class="line">    max_batch_size=<span class="number">64</span>,</span><br><span class="line">    max_sequence_length=<span class="number">8192</span>,</span><br><span class="line">    enable_cuda_graph=<span class="literal">True</span>,</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 异步推理</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">generate</span>():</span><br><span class="line">    response = <span class="keyword">await</span> engine.generate_async(</span><br><span class="line">        prompts=[<span class="string">&quot;Hello, how are you?&quot;</span>],</span><br><span class="line">        max_new_tokens=<span class="number">100</span>,</span><br><span class="line">        temperature=<span class="number">0.7</span>,</span><br><span class="line">    )</span><br><span class="line">    <span class="keyword">return</span> response</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-9-容错训练（NVRx）"><a href="#7-9-容错训练（NVRx）" class="headerlink" title="7.9 容错训练（NVRx）"></a>7.9 容错训练（NVRx）</h3><p><strong>NVIDIA Resiliency Extension 集成</strong>:</p>
+<p><strong>功能</strong>:</p>
+<ul>
+<li><strong>Straggler Detection</strong>: 掉队检测</li>
+<li><strong>Fault Detection</strong>: 故障检测</li>
+<li><strong>Hang Detection</strong>: 挂起检测</li>
+<li><strong>Automatic Recovery</strong>: 自动恢复</li>
+</ul>
+<p><strong>配置</strong>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 启用容错训练</span></span><br><span class="line">--enable-ft-pipeline</span><br><span class="line">--ft-timeout <span class="number">300</span></span><br><span class="line">--straggler-detector-enabled</span><br><span class="line">--straggler-detector-window-size <span class="number">10</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="7-10-CUDA-Graphs"><a href="#7-10-CUDA-Graphs" class="headerlink" title="7.10 CUDA Graphs"></a>7.10 CUDA Graphs</h3><p><strong>优化内核启动开销</strong>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># CUDA Graphs 配置</span></span><br><span class="line"><span class="keyword">if</span> args.use_cuda_graph:</span><br><span class="line">    cuda_graph = FullCudaGraphWrapper(</span><br><span class="line">        model=model,</span><br><span class="line">        optimizer=optimizer,</span><br><span class="line">        data_loader=train_data_iterator,</span><br><span class="line">    )</span><br></pre></td></tr></table></figure>
+
+<p><strong>MoE CUDA Graphs 优化</strong>:</p>
+<ul>
+<li>支持动态专家选择</li>
+<li>优化Token分发路径</li>
+<li>减少内核启动开销</li>
+</ul>
+<hr>
+<h2 id="8-代码组织结构"><a href="#8-代码组织结构" class="headerlink" title="8. 代码组织结构"></a>8. 代码组织结构</h2><h3 id="8-1-关键文件清单"><a href="#8-1-关键文件清单" class="headerlink" title="8.1 关键文件清单"></a>8.1 关键文件清单</h3><h4 id="训练入口"><a href="#训练入口" class="headerlink" title="训练入口"></a>训练入口</h4><table>
+<thead>
+<tr>
+<th>文件</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>pretrain_gpt.py</code></td>
+<td>GPT 模型预训练入口</td>
+</tr>
+<tr>
+<td><code>pretrain_bert.py</code></td>
+<td>BERT 模型预训练入口</td>
+</tr>
+<tr>
+<td><code>pretrain_t5.py</code></td>
+<td>T5 模型预训练入口</td>
+</tr>
+<tr>
+<td><code>pretrain_vlm.py</code></td>
+<td>多模态模型预训练入口</td>
+</tr>
+</tbody></table>
+<h4 id="核心组件"><a href="#核心组件" class="headerlink" title="核心组件"></a>核心组件</h4><table>
+<thead>
+<tr>
+<th>目录&#x2F;文件</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>megatron/core/transformer/</code></td>
+<td>Transformer 核心组件</td>
+</tr>
+<tr>
+<td><code>megatron/core/models/</code></td>
+<td>模型实现</td>
+</tr>
+<tr>
+<td><code>megatron/core/parallel_state.py</code></td>
+<td>并行状态管理</td>
+</tr>
+<tr>
+<td><code>megatron/core/hyper_comm_grid.py</code></td>
+<td>N维通信网格管理</td>
+</tr>
+<tr>
+<td><code>megatron/core/tensor_parallel/</code></td>
+<td>张量并行实现</td>
+</tr>
+<tr>
+<td><code>megatron/core/pipeline_parallel/</code></td>
+<td>流水线并行实现</td>
+</tr>
+<tr>
+<td><code>megatron/core/optimizer/</code></td>
+<td>优化器实现</td>
+</tr>
+<tr>
+<td><code>megatron/core/datasets/</code></td>
+<td>数据集加载器</td>
+</tr>
+<tr>
+<td><code>megatron/core/inference/</code></td>
+<td>推理引擎</td>
+</tr>
+<tr>
+<td><code>megatron/core/transformer/moe/</code></td>
+<td>MoE 实现</td>
+</tr>
+<tr>
+<td><code>megatron/core/transformer/multi_latent_attention.py</code></td>
+<td>MLA 实现</td>
+</tr>
+<tr>
+<td><code>megatron/training/training.py</code></td>
+<td>训练主循环</td>
+</tr>
+<tr>
+<td><code>megatron/training/checkpointing.py</code></td>
+<td>检查点管理</td>
+</tr>
+</tbody></table>
+<h4 id="工具脚本"><a href="#工具脚本" class="headerlink" title="工具脚本"></a>工具脚本</h4><table>
+<thead>
+<tr>
+<th>文件</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tools/preprocess_data.py</code></td>
+<td>数据预处理</td>
+</tr>
+<tr>
+<td><code>tools/checkpoint/</code></td>
+<td>检查点转换工具</td>
+</tr>
+<tr>
+<td><code>tools/run_text_generation_server.py</code></td>
+<td>推理服务器</td>
+</tr>
+</tbody></table>
+<h3 id="8-2-配置管理"><a href="#8-2-配置管理" class="headerlink" title="8.2 配置管理"></a>8.2 配置管理</h3><p><strong>层次化配置</strong>:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">graph TD</span><br><span class="line">    GlobalConfig[全局配置&lt;br/&gt;megatron/training/arguments.py]</span><br><span class="line">    </span><br><span class="line">    ModelConfig[模型配置&lt;br/&gt;TransformerConfig]</span><br><span class="line">    ParallelConfig[并行配置&lt;br/&gt;ModelParallelConfig]</span><br><span class="line">    OptimizerConfig[优化器配置&lt;br/&gt;OptimizerConfig]</span><br><span class="line">    DataConfig[数据配置&lt;br/&gt;DataConfig]</span><br><span class="line">    </span><br><span class="line">    GlobalConfig --&gt; ModelConfig</span><br><span class="line">    GlobalConfig --&gt; ParallelConfig</span><br><span class="line">    GlobalConfig --&gt; OptimizerConfig</span><br><span class="line">    GlobalConfig --&gt; DataConfig</span><br><span class="line">    </span><br><span class="line">    LayerSpec[层规范&lt;br/&gt;ModuleSpec]</span><br><span class="line">    ModelConfig --&gt; LayerSpec</span><br><span class="line">    </span><br><span class="line">    ProcessGroups[进程组&lt;br/&gt;ProcessGroupCollection]</span><br><span class="line">    ParallelConfig --&gt; ProcessGroups</span><br></pre></td></tr></table></figure>
+
+<h3 id="8-3-测试体系"><a href="#8-3-测试体系" class="headerlink" title="8.3 测试体系"></a>8.3 测试体系</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">tests/</span><br><span class="line">├── unit_tests/                      # 单元测试</span><br><span class="line">│   ├── data/                        # 数据加载测试</span><br><span class="line">│   ├── dist_checkpointing/          # 检查点测试</span><br><span class="line">│   ├── distributed/                 # 分布式测试</span><br><span class="line">│   ├── inference/                   # 推理测试</span><br><span class="line">│   ├── models/                      # 模型测试</span><br><span class="line">│   ├── pipeline_parallel/           # 流水线并行测试</span><br><span class="line">│   ├── tensor_parallel/             # 张量并行测试</span><br><span class="line">│   └── transformer/                 # Transformer测试</span><br><span class="line">└── functional_tests/                # 功能测试</span><br><span class="line">    ├── test_scripts/                # 测试脚本</span><br><span class="line">    └── test_results/                # 测试结果</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="9-性能优化技巧"><a href="#9-性能优化技巧" class="headerlink" title="9. 性能优化技巧"></a>9. 性能优化技巧</h2><h3 id="9-1-内存优化"><a href="#9-1-内存优化" class="headerlink" title="9.1 内存优化"></a>9.1 内存优化</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    subgraph &quot;内存优化策略&quot;</span><br><span class="line">        A[激活重计算&lt;br/&gt;Activation Recomputation]</span><br><span class="line">        B[梯度累积&lt;br/&gt;Gradient Accumulation]</span><br><span class="line">        C[CPU Offloading&lt;br/&gt;参数/优化器状态]</span><br><span class="line">        D[序列并行&lt;br/&gt;Sequence Parallel]</span><br><span class="line">        E[混合精度&lt;br/&gt;Mixed Precision]</span><br><span class="line">        F[Flash Attention&lt;br/&gt;高效注意力]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Memory[内存使用]</span><br><span class="line">    </span><br><span class="line">    A --&gt; Memory</span><br><span class="line">    B --&gt; Memory</span><br><span class="line">    C --&gt; Memory</span><br><span class="line">    D --&gt; Memory</span><br><span class="line">    E --&gt; Memory</span><br><span class="line">    F --&gt; Memory</span><br><span class="line">    </span><br><span class="line">    style Memory fill:#FF6B6B</span><br></pre></td></tr></table></figure>
+
+<h3 id="9-2-通信优化"><a href="#9-2-通信优化" class="headerlink" title="9.2 通信优化"></a>9.2 通信优化</h3><ol>
+<li><p><strong>重叠通信和计算</strong></p>
+<ul>
+<li>梯度规约与反向传播重叠</li>
+<li>参数收集与前向传播重叠</li>
+</ul>
+</li>
+<li><p><strong>通信融合</strong></p>
+<ul>
+<li>多个小通信操作融合为一个大操作</li>
+<li>减少通信次数</li>
+</ul>
+</li>
+<li><p><strong>通信压缩</strong></p>
+<ul>
+<li>FP16&#x2F;BF16 梯度通信</li>
+<li>梯度压缩算法</li>
+</ul>
+</li>
+</ol>
+<h3 id="9-3-计算优化"><a href="#9-3-计算优化" class="headerlink" title="9.3 计算优化"></a>9.3 计算优化</h3><ol>
+<li><p><strong>内核融合</strong></p>
+<ul>
+<li>LayerNorm + Dropout</li>
+<li>Bias + GELU</li>
+<li>Softmax + Mask</li>
+</ul>
+</li>
+<li><p><strong>高效算子</strong></p>
+<ul>
+<li>Flash Attention</li>
+<li>Fused Adam</li>
+<li>Fused LayerNorm</li>
+</ul>
+</li>
+<li><p><strong>CUDA Graphs</strong></p>
+<ul>
+<li>减少内核启动开销</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2 id="10-最佳实践"><a href="#10-最佳实践" class="headerlink" title="10. 最佳实践"></a>10. 最佳实践</h2><h3 id="10-1-启动配置示例"><a href="#10-1-启动配置示例" class="headerlink" title="10.1 启动配置示例"></a>10.1 启动配置示例</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/bin/bash</span></span><br><span class="line"><span class="comment"># 关键参数配置示例</span></span><br><span class="line"></span><br><span class="line">torchrun \</span><br><span class="line">    --nproc_per_node 8 \</span><br><span class="line">    --nnodes 8 \</span><br><span class="line">    pretrain_gpt.py \</span><br><span class="line">    --tensor-model-parallel-size 4 \</span><br><span class="line">    --pipeline-model-parallel-size 2 \</span><br><span class="line">    --num-layers 40 \</span><br><span class="line">    --hidden-size 5120 \</span><br><span class="line">    --num-attention-heads 40 \</span><br><span class="line">    --seq-length 4096 \</span><br><span class="line">    --micro-batch-size 1 \</span><br><span class="line">    --global-batch-size 256 \</span><br><span class="line">    --lr 1.5e-4 \</span><br><span class="line">    --min-lr 1.5e-5 \</span><br><span class="line">    --lr-decay-style cosine \</span><br><span class="line">    --weight-decay 0.1 \</span><br><span class="line">    --clip-grad 1.0 \</span><br><span class="line">    --fp16 \</span><br><span class="line">    --use-distributed-optimizer \</span><br><span class="line">    --overlap-grad-reduce \</span><br><span class="line">    --overlap-param-gather</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键参数说明</strong>:</p>
+<ul>
+<li><code>tensor-model-parallel-size</code>: 张量并行度</li>
+<li><code>pipeline-model-parallel-size</code>: 流水线并行度</li>
+<li><code>global-batch-size</code>: 全局批次大小 &#x3D; micro-batch-size × DP × 梯度累积步数</li>
+<li><code>overlap-grad-reduce</code>: 重叠梯度通信与计算</li>
+<li><code>use-distributed-optimizer</code>: 启用分布式优化器</li>
+</ul>
+<h3 id="10-2-调试技巧"><a href="#10-2-调试技巧" class="headerlink" title="10.2 调试技巧"></a>10.2 调试技巧</h3><ol>
+<li><p><strong>启用详细日志</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> NCCL_DEBUG=INFO</span><br><span class="line"><span class="built_in">export</span> TORCH_DISTRIBUTED_DEBUG=DETAIL</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>检查张量形状</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> megatron.core <span class="keyword">import</span> mpu</span><br><span class="line"><span class="built_in">print</span>(<span class="string">f&quot;TP rank: <span class="subst">&#123;mpu.get_tensor_model_parallel_rank()&#125;</span>&quot;</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="string">f&quot;Tensor shape: <span class="subst">&#123;tensor.shape&#125;</span>&quot;</span>)</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>验证梯度</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 检查梯度是否为 NaN</span></span><br><span class="line"><span class="keyword">for</span> name, param <span class="keyword">in</span> model.named_parameters():</span><br><span class="line">    <span class="keyword">if</span> param.grad <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">if</span> torch.isnan(param.grad).<span class="built_in">any</span>():</span><br><span class="line">            <span class="built_in">print</span>(<span class="string">f&quot;NaN gradient in <span class="subst">&#123;name&#125;</span>&quot;</span>)</span><br></pre></td></tr></table></figure></li>
+</ol>
+<hr>
+<h2 id="11-总结"><a href="#11-总结" class="headerlink" title="11. 总结"></a>11. 总结</h2><h3 id="11-1-核心优势"><a href="#11-1-核心优势" class="headerlink" title="11.1 核心优势"></a>11.1 核心优势</h3><ol>
+<li><strong>高性能</strong>: GPU 优化的内核和通信策略</li>
+<li><strong>可扩展</strong>: 支持千卡级别的大规模训练</li>
+<li><strong>灵活性</strong>: 模块化设计，易于定制</li>
+<li><strong>生态丰富</strong>: 与多个框架和工具集成</li>
+</ol>
+<h3 id="11-2-适用场景"><a href="#11-2-适用场景" class="headerlink" title="11.2 适用场景"></a>11.2 适用场景</h3><ul>
+<li>大规模预训练（1B - 1000B+ 参数）</li>
+<li>多模态模型训练（文本、图像、视频）</li>
+<li>细粒度 MoE 模型训练（DeepSeek-V3、Qwen3、Mixtral）</li>
+<li>超长上下文模型（32K - 256K+ tokens）</li>
+<li>高性能分布式推理</li>
+<li>Blackwell 平台优化训练</li>
+<li>跨数据中心训练（N&#x2F;S连接）</li>
+</ul>
+<h3 id="11-3-学习路径"><a href="#11-3-学习路径" class="headerlink" title="11.3 学习路径"></a>11.3 学习路径</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    A[理解基础概念] --&gt; B[学习并行策略]</span><br><span class="line">    B --&gt; C[运行示例代码]</span><br><span class="line">    C --&gt; D[自定义模型]</span><br><span class="line">    D --&gt; E[性能优化]</span><br><span class="line">    E --&gt; F[生产部署]</span><br><span class="line">    </span><br><span class="line">    style A fill:#90EE90</span><br><span class="line">    style F fill:#FF6B6B</span><br></pre></td></tr></table></figure>
+
+<h3 id="11-4-参考资源"><a href="#11-4-参考资源" class="headerlink" title="11.4 参考资源"></a>11.4 参考资源</h3><ul>
+<li><strong>官方文档</strong>: <a target="_blank" rel="noopener" href="https://docs.nvidia.com/Megatron-Core/">https://docs.nvidia.com/Megatron-Core/</a></li>
+<li><strong>GitHub 仓库</strong>: <a target="_blank" rel="noopener" href="https://github.com/NVIDIA/Megatron-LM">https://github.com/NVIDIA/Megatron-LM</a></li>
+<li><strong>论文</strong>:<ul>
+<li><a target="_blank" rel="noopener" href="https://arxiv.org/abs/1909.08053">Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism</a></li>
+<li><a target="_blank" rel="noopener" href="https://arxiv.org/abs/2104.04473">Efficient Large-Scale Language Model Training on GPU Clusters Using Megatron-LM</a></li>
+<li><a target="_blank" rel="noopener" href="https://arxiv.org/abs/2205.05198">Reducing Activation Recomputation in Large Transformer Models</a></li>
+</ul>
+</li>
+</ul>
+<hr>
+<p><strong>报告结束</strong></p>
+<p><em>此报告基于 Megatron-LM v0.14.0 代码库分析生成</em></p>
+</article>
+<div class="article-footer">
+    <section id="license">
+      <div class="header"><span>许可协议</span></div>
+      <div class="body"><p>本文采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">署名-非商业性使用-相同方式共享 4.0 国际</a> 许可协议，转载请注明出处。</p>
+</div>
+    </section>
+    
+
+</div>
+
+<div class="related-wrap" id="read-next"><section class="body"><div class="item" id="prev"><div class="note">较新文章</div><a href="/2025/11/17/TransformerEngine_DeepDive/">Transformer Engine 架构设计分析</a></div><div class="item" id="next"><div class="note">较早文章</div><a href="/2025/11/17/HCCL_DeepDive/">HCCL 集合通信库设计分析</a></div></section></div>
+
+
+
+
+  <div class="related-wrap md-text" id="comments">
+    <section class='header cmt-title cap theme'>
+      <p>快来参与讨论吧~</p>
+
+    </section>
+    <section class='body cmt-body giscus'>
+      
+
+<svg class="loading" style="vertical-align:middle;fill:currentColor;overflow:hidden;" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2709"><path d="M832 512c0-176-144-320-320-320V128c211.2 0 384 172.8 384 384h-64zM192 512c0 176 144 320 320 320v64C300.8 896 128 723.2 128 512h64z" p-id="2710"></path></svg>
+
+<div id="giscus" src="https://giscus.app/client.js" data-repo="nash635/nash635.github.io" data-repo-id="R_kgDOKBdEtA" data-category="General" data-category-id="DIC_kwDOKBdEtM4CxbhU" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous"></div>
+
+    </section>
+  </div>
+
+
+
+<footer class="page-footer footnote"><hr><div class="text"><p>本站由 <a href="/">nash635</a> 使用 <a target="_blank" rel="noopener" href="https://github.com/xaoxuu/hexo-theme-stellar/tree/1.33.1">Stellar 1.33.1</a> 主题创建。<br>本博客所有文章除特别声明外，均采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可协议，转载请注明出处。</p>
+</div></footer>
+<div class="main-mask" onclick="sidebar.dismiss()"></div></div><aside class="l_right">
+<div class="widgets">
+
+
+
+<widget class="widget-wrapper toc" id="data-toc" collapse="false"><div class="widget-header dis-select"><span class="name">本文目录</span><a class="cap-action" onclick="sidebar.toggleTOC()" ><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6h11m-11 6h11m-11 6h11M4 6h1v4m-1 0h2m0 8H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></a></div><div class="widget-body"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Megatron-LM-%E4%BB%A3%E7%A0%81%E5%BA%93%E6%9E%B6%E6%9E%84%E5%88%86%E6%9E%90%E6%8A%A5%E5%91%8A"><span class="toc-text">Megatron-LM 代码库架构分析报告</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9B%AE%E5%BD%95"><span class="toc-text">目录</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E9%A1%B9%E7%9B%AE%E6%A6%82%E8%BF%B0"><span class="toc-text">1. 项目概述</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-1-%E9%A1%B9%E7%9B%AE%E5%AE%9A%E4%BD%8D"><span class="toc-text">1.1 项目定位</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-2-%E4%B8%BB%E8%A6%81%E7%89%B9%E7%82%B9"><span class="toc-text">1.2 主要特点</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-3-%E7%94%9F%E6%80%81%E7%B3%BB%E7%BB%9F"><span class="toc-text">1.3 生态系统</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E6%95%B4%E4%BD%93%E6%9E%B6%E6%9E%84"><span class="toc-text">2. 整体架构</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-1-%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84"><span class="toc-text">2.1 项目结构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E5%9B%BE"><span class="toc-text">2.2 系统架构图</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E6%A0%B8%E5%BF%83%E6%A8%A1%E5%9D%97%E5%88%86%E6%9E%90"><span class="toc-text">3. 核心模块分析</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-Transformer-%E7%BB%84%E4%BB%B6"><span class="toc-text">3.1 Transformer 组件</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-1-1-TransformerConfig"><span class="toc-text">3.1.1 TransformerConfig</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-1-2-TransformerLayer"><span class="toc-text">3.1.2 TransformerLayer</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-1-3-Attention-%E6%9C%BA%E5%88%B6"><span class="toc-text">3.1.3 Attention 机制</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-2-%E6%A8%A1%E5%9E%8B%E5%AE%9E%E7%8E%B0"><span class="toc-text">3.2 模型实现</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-2-1-GPTModel-%E6%9E%B6%E6%9E%84"><span class="toc-text">3.2.1 GPTModel 架构</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-2-2-%E6%94%AF%E6%8C%81%E7%9A%84%E6%A8%A1%E5%9E%8B%E7%B1%BB%E5%9E%8B"><span class="toc-text">3.2.2 支持的模型类型</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E5%B9%B6%E8%A1%8C%E7%AD%96%E7%95%A5%E8%AF%A6%E8%A7%A3"><span class="toc-text">4. 并行策略详解</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-%E5%B9%B6%E8%A1%8C%E7%AD%96%E7%95%A5%E6%A6%82%E8%A7%88"><span class="toc-text">4.1 并行策略概览</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-Tensor-Parallel%EF%BC%88%E5%BC%A0%E9%87%8F%E5%B9%B6%E8%A1%8C%EF%BC%89"><span class="toc-text">4.2 Tensor Parallel（张量并行）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-Pipeline-Parallel%EF%BC%88%E6%B5%81%E6%B0%B4%E7%BA%BF%E5%B9%B6%E8%A1%8C%EF%BC%89"><span class="toc-text">4.3 Pipeline Parallel（流水线并行）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-5-Expert-Parallel%EF%BC%88%E4%B8%93%E5%AE%B6%E5%B9%B6%E8%A1%8C%EF%BC%89"><span class="toc-text">4.5 Expert Parallel（专家并行）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-6-Context-Parallel%EF%BC%88%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B9%B6%E8%A1%8C%EF%BC%89"><span class="toc-text">4.6 Context Parallel（上下文并行）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-7-%E5%B9%B6%E8%A1%8C%E7%AD%96%E7%95%A5%E9%80%89%E6%8B%A9%E6%8C%87%E5%8D%97"><span class="toc-text">4.7 并行策略选择指南</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E6%A8%A1%E5%9E%8B%E5%AE%9E%E7%8E%B0"><span class="toc-text">5. 模型实现</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-%E6%A8%A1%E5%9E%8B%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84"><span class="toc-text">5.1 模型层次结构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-MoE%EF%BC%88Mixture-of-Experts%EF%BC%89%E5%AE%9E%E7%8E%B0"><span class="toc-text">5.2 MoE（Mixture of Experts）实现</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-3-Multi-Token-Prediction-MTP"><span class="toc-text">5.3 Multi-Token Prediction (MTP)</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E8%AE%AD%E7%BB%83%E6%B5%81%E7%A8%8B"><span class="toc-text">6. 训练流程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#6-1-%E8%AE%AD%E7%BB%83%E4%B8%BB%E5%BE%AA%E7%8E%AF"><span class="toc-text">6.1 训练主循环</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-2-%E6%B7%B7%E5%90%88%E7%B2%BE%E5%BA%A6%E8%AE%AD%E7%BB%83%E6%B5%81%E7%A8%8B"><span class="toc-text">6.2 混合精度训练流程</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-%E5%85%B3%E9%94%AE%E6%8A%80%E6%9C%AF%E7%89%B9%E6%80%A7"><span class="toc-text">7. 关键技术特性</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#7-1-FP8-%E8%AE%AD%E7%BB%83"><span class="toc-text">7.1 FP8 训练</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-2-%E5%BA%8F%E5%88%97%E5%B9%B6%E8%A1%8C%EF%BC%88Sequence-Parallel%EF%BC%89"><span class="toc-text">7.2 序列并行（Sequence Parallel）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-3-%E9%87%8D%E8%AE%A1%E7%AE%97%EF%BC%88Activation-Recomputation%EF%BC%89"><span class="toc-text">7.3 重计算（Activation Recomputation）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-4-%E5%88%86%E5%B8%83%E5%BC%8F%E4%BC%98%E5%8C%96%E5%99%A8"><span class="toc-text">7.4 分布式优化器</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-5-Flash-Attention"><span class="toc-text">7.5 Flash Attention</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-6-Multi-Latent-Attention-MLA"><span class="toc-text">7.6 Multi-Latent Attention (MLA)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-7-HyperCommGrid"><span class="toc-text">7.7 HyperCommGrid</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-8-%E5%8A%A8%E6%80%81%E6%8E%A8%E7%90%86%E5%BC%95%E6%93%8E"><span class="toc-text">7.8 动态推理引擎</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-9-%E5%AE%B9%E9%94%99%E8%AE%AD%E7%BB%83%EF%BC%88NVRx%EF%BC%89"><span class="toc-text">7.9 容错训练（NVRx）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-10-CUDA-Graphs"><span class="toc-text">7.10 CUDA Graphs</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-%E4%BB%A3%E7%A0%81%E7%BB%84%E7%BB%87%E7%BB%93%E6%9E%84"><span class="toc-text">8. 代码组织结构</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#8-1-%E5%85%B3%E9%94%AE%E6%96%87%E4%BB%B6%E6%B8%85%E5%8D%95"><span class="toc-text">8.1 关键文件清单</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E8%AE%AD%E7%BB%83%E5%85%A5%E5%8F%A3"><span class="toc-text">训练入口</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E7%BB%84%E4%BB%B6"><span class="toc-text">核心组件</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%B7%A5%E5%85%B7%E8%84%9A%E6%9C%AC"><span class="toc-text">工具脚本</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-2-%E9%85%8D%E7%BD%AE%E7%AE%A1%E7%90%86"><span class="toc-text">8.2 配置管理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-3-%E6%B5%8B%E8%AF%95%E4%BD%93%E7%B3%BB"><span class="toc-text">8.3 测试体系</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#9-%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E6%8A%80%E5%B7%A7"><span class="toc-text">9. 性能优化技巧</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#9-1-%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="toc-text">9.1 内存优化</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-2-%E9%80%9A%E4%BF%A1%E4%BC%98%E5%8C%96"><span class="toc-text">9.2 通信优化</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-3-%E8%AE%A1%E7%AE%97%E4%BC%98%E5%8C%96"><span class="toc-text">9.3 计算优化</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#10-%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5"><span class="toc-text">10. 最佳实践</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#10-1-%E5%90%AF%E5%8A%A8%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B"><span class="toc-text">10.1 启动配置示例</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-2-%E8%B0%83%E8%AF%95%E6%8A%80%E5%B7%A7"><span class="toc-text">10.2 调试技巧</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#11-%E6%80%BB%E7%BB%93"><span class="toc-text">11. 总结</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#11-1-%E6%A0%B8%E5%BF%83%E4%BC%98%E5%8A%BF"><span class="toc-text">11.1 核心优势</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-2-%E9%80%82%E7%94%A8%E5%9C%BA%E6%99%AF"><span class="toc-text">11.2 适用场景</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-3-%E5%AD%A6%E4%B9%A0%E8%B7%AF%E5%BE%84"><span class="toc-text">11.3 学习路径</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-4-%E5%8F%82%E8%80%83%E8%B5%84%E6%BA%90"><span class="toc-text">11.4 参考资源</span></a></li></ol></li></ol></li></ol></div><div class="widget-footer"><a class="top" onclick="util.scrollTop()"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path stroke-linejoin="round" d="m9 15.5l3-3l3 3m-6-4l3-3l3 3"/><path d="M7 3.338A9.95 9.95 0 0 1 12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12c0-1.821.487-3.53 1.338-5"/></g></svg><span>回到顶部</span></a><a class="buttom" onclick="util.scrollComment()"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M8 10.5h8M8 14h5.5M17 3.338A9.95 9.95 0 0 0 12 2C6.477 2 2 6.477 2 12c0 1.6.376 3.112 1.043 4.453c.178.356.237.763.134 1.148l-.595 2.226a1.3 1.3 0 0 0 1.591 1.592l2.226-.596a1.63 1.63 0 0 1 1.149.133A9.96 9.96 0 0 0 12 22c5.523 0 10-4.477 10-10c0-1.821-.487-3.53-1.338-5"/></svg><span>参与讨论</span></a></div></widget>
+</div></aside><div class='float-panel'>
+  <button type='button' style='display:none' class='laptop-only rightbar-toggle mobile' onclick='sidebar.rightbar()'>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6h11m-11 6h11m-11 6h11M4 6h1v4m-1 0h2m0 8H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+  </button>
+  <button type='button' style='display:none' class='mobile-only leftbar-toggle mobile' onclick='sidebar.leftbar()'>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 11c0-3.771 0-5.657 1.172-6.828C4.343 3 6.229 3 10 3h4c3.771 0 5.657 0 6.828 1.172C22 5.343 22 7.229 22 11v2c0 3.771 0 5.657-1.172 6.828C19.657 21 17.771 21 14 21h-4c-3.771 0-5.657 0-6.828-1.172C2 18.657 2 16.771 2 13z"/><path id="sep" stroke-linecap="round" d="M5.5 10h6m-5 4h4m4.5 7V3"/></g></svg>
+  </button>
+</div>
+</div><div class="scripts">
+
+
+<script type="text/javascript">
+  window.canonical = {"originalHost":null,"officialHosts":["localhost"],"encoded":""};
+  const ctx = {
+    date_suffix: {
+      just: `刚刚`,
+      min: `分钟前`,
+      hour: `小时前`,
+      day: `天前`,
+    },
+    root : `/`,
+    tag_plugins: {
+      chat: Object.assign({"api":"https://siteinfo.listentothewind.cn/api/v1"}),
+    }
+  };
+
+  // required plugins (only load if needs)
+  if (`local_search`) {
+    ctx.search = {};
+    ctx.search.service = `local_search`;
+    if (ctx.search.service == 'local_search') {
+      let service_obj = Object.assign({}, `{"field":"all","path":"/search.json","content":true,"skip_search":null,"sort":"-date"}`);
+      ctx.search[ctx.search.service] = service_obj;
+    }
+  }
+  const def = {
+    avatar: `https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/avatar/round/3442075.svg`,
+    cover: `https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/cover/76b86c0226ffd.svg`,
+    loading: `https://api.iconify.design/eos-icons:three-dots-loading.svg?color=%231cd0fd`,
+  };
+  const deps = {
+    jquery: `https://gcore.jsdelivr.net/npm/jquery@3.7/dist/jquery.min.js`,
+    marked: `https://gcore.jsdelivr.net/npm/marked@13.0/lib/marked.umd.min.js`,
+    lazyload: `/%5Bobject%20Object%5D`
+  }
+  
+
+</script>
+
+<script type="text/javascript">
+  
+  function RunItem() {
+    this.list = []; // 存放回调函数
+    this.start = () => {
+      for (var i = 0; i < this.list.length; i++) {
+        this.list[i].run();
+      }
+    };
+    this.push = (fn, name, setRequestAnimationFrame = true) => {
+      let myfn = fn
+      if (setRequestAnimationFrame) {
+        myfn = () => {
+          utils.requestAnimationFrame(fn)
+        }
+      }
+      var f = new Item(myfn, name);
+      this.list.push(f);
+    };
+    this.remove = (name) => {
+      for (let index = 0; index < this.list.length; index++) {
+        const e = this.list[index];
+        if (e.name == name) {
+          this.list.splice(index, 1);
+        }
+      }
+    }
+    // 构造一个可以run的对象
+    function Item(fn, name) {
+      // 函数名称
+      this.name = name || fn.name;
+      // run方法
+      this.run = () => {
+        try {
+          fn()
+        } catch (error) {
+          console.log(error);
+        }
+      };
+    }
+  }
+
+  const utils = {
+    // 懒加载 css https://github.com/filamentgroup/loadCSS
+    css: (href, before, media, attributes) => {
+      var doc = window.document;
+      var ss = doc.createElement("link");
+      var ref;
+      if (before) {
+        ref = before;
+      } else {
+        var refs = (doc.body || doc.getElementsByTagName("head")[0]).childNodes;
+        ref = refs[refs.length - 1];
+      }
+      var sheets = doc.styleSheets;
+      if (attributes) {
+        for (var attributeName in attributes) {
+          if (attributes.hasOwnProperty(attributeName)) {
+            ss.setAttribute(attributeName, attributes[attributeName]);
+          }
+        }
+      }
+      ss.rel = "stylesheet";
+      ss.href = href;
+      ss.media = "only x";
+      function ready(cb) {
+        if (doc.body) {
+          return cb();
+        }
+        setTimeout(function () {
+          ready(cb);
+        });
+      }
+      ready(function () {
+        ref.parentNode.insertBefore(ss, before ? ref : ref.nextSibling);
+      });
+      var onloadcssdefined = function (cb) {
+        var resolvedHref = ss.href;
+        var i = sheets.length;
+        while (i--) {
+          if (sheets[i].href === resolvedHref) {
+            return cb();
+          }
+        }
+        setTimeout(function () {
+          onloadcssdefined(cb);
+        });
+      };
+      function loadCB() {
+        if (ss.addEventListener) {
+          ss.removeEventListener("load", loadCB);
+        }
+        ss.media = media || "all";
+      }
+      if (ss.addEventListener) {
+        ss.addEventListener("load", loadCB);
+      }
+      ss.onloadcssdefined = onloadcssdefined;
+      onloadcssdefined(loadCB);
+      return ss;
+    },
+
+    js: (src, opt) => new Promise((resolve, reject) => {
+      var script = document.createElement('script');
+      if (src.startsWith('/')) {
+        src = ctx.root + src.substring(1);
+      }
+      script.src = src;
+      if (opt) {
+        for (let key of Object.keys(opt)) {
+          script[key] = opt[key]
+        }
+      } else {
+        // 默认异步，如果需要同步，第二个参数传入 {} 即可
+        script.async = true
+      }
+      script.onerror = reject
+      script.onload = script.onreadystatechange = function () {
+        const loadState = this.readyState
+        if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+        script.onload = script.onreadystatechange = null
+        resolve()
+      }
+      document.head.appendChild(script)
+    }),
+
+    jq: (fn) => {
+      if (typeof jQuery === 'undefined') {
+        utils.js(deps.jquery).then(fn)
+      } else {
+        fn()
+      }
+    },
+
+    onLoading: (el) => {
+      if (el) {
+        $(el).append('<div class="loading-wrap"><svg xmlns="http://www.w3.org/2000/svg" width="2em" height="2em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"><path stroke-dasharray="60" stroke-dashoffset="60" stroke-opacity=".3" d="M12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="1.3s" values="60;0"/></path><path stroke-dasharray="15" stroke-dashoffset="15" d="M12 3C16.9706 3 21 7.02944 21 12"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.3s" values="15;0"/><animateTransform attributeName="transform" dur="1.5s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/></path></g></svg></div>');
+      }
+    },
+    onLoadSuccess: (el) => {
+      if (el) {
+        $(el).find('.loading-wrap').remove();
+      }
+    },
+    onLoadFailure: (el) => {
+      if (el) {
+        $(el).find('.loading-wrap svg').remove();
+        $(el).find('.loading-wrap').append('<svg xmlns="http://www.w3.org/2000/svg" width="2em" height="2em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path stroke-dasharray="60" stroke-dashoffset="60" d="M12 3L21 20H3L12 3Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.5s" values="60;0"/></path><path stroke-dasharray="6" stroke-dashoffset="6" d="M12 10V14"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="6;0"/></path></g><circle cx="12" cy="17" r="1" fill="currentColor" fill-opacity="0"><animate fill="freeze" attributeName="fill-opacity" begin="0.8s" dur="0.4s" values="0;1"/></circle></svg>');
+        $(el).find('.loading-wrap').addClass('error');
+      }
+    },
+    request: (el, url, callback, onFailure) => {
+      const maxRetry = 3;
+      let retryCount = 0;
+
+      return new Promise((resolve, reject) => {
+        const load = () => {
+          utils.onLoading?.(el);
+
+          let timedOut = false;
+          const timeout = setTimeout(() => {
+            timedOut = true;
+            console.warn('[request] 超时:', url);
+
+            if (++retryCount >= maxRetry) {
+              utils.onLoadFailure?.(el);
+              onFailure?.();
+              reject('请求超时');
+            } else {
+              setTimeout(load, 1000);
+            }
+          }, 5000);
+
+          fetch(url).then(resp => {
+            if (timedOut) return;
+            clearTimeout(timeout);
+
+            if (!resp.ok) throw new Error('响应失败');
+            return resp;
+          }).then(data => {
+            if (timedOut) return;
+            utils.onLoadSuccess?.(el);
+            callback(data);
+            resolve(data);
+          }).catch(err => {
+            clearTimeout(timeout);
+            console.warn('[request] 错误:', err);
+
+            if (++retryCount >= maxRetry) {
+              utils.onLoadFailure?.(el);
+              onFailure?.();
+              reject(err);
+            } else {
+              setTimeout(load, 1000);
+            }
+          });
+        };
+
+        load();
+      });
+    },
+    requestWithoutLoading: (url, options = {}, maxRetry = 2, timeout = 5000) => {
+      return new Promise((resolve, reject) => {
+        let retryCount = 0;
+
+        const tryRequest = () => {
+          let timedOut = false;
+          const timer = setTimeout(() => {
+            timedOut = true;
+            if (++retryCount > maxRetry) reject('timeout');
+            else tryRequest();
+          }, timeout);
+
+          fetch(url, options)
+            .then(resp => {
+              clearTimeout(timer);
+              if (!resp.ok) throw new Error('bad response');
+              resolve(resp);
+            })
+            .catch(err => {
+              clearTimeout(timer);
+              if (++retryCount > maxRetry) reject(err);
+              else setTimeout(tryRequest, 500);
+            });
+        };
+
+        tryRequest();
+      });
+    },
+    /********************** requestAnimationFrame ********************************/
+    // 1、requestAnimationFrame 会把每一帧中的所有 DOM 操作集中起来，在一次重绘或回流中就完成，并且重绘或回流的时间间隔紧紧跟随浏览器的刷新频率，一般来说，这个频率为每秒60帧。
+    // 2、在隐藏或不可见的元素中，requestAnimationFrame 将不会进行重绘或回流，这当然就意味着更少的的 cpu，gpu 和内存使用量。
+    requestAnimationFrame: (fn) => {
+      if (!window.requestAnimationFrame) {
+        window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
+      }
+      window.requestAnimationFrame(fn)
+    },
+    dark: {},
+  };
+
+  // utils.dark.mode 当前模式 dark or light
+  // utils.dark.toggle() 暗黑模式触发器
+  // utils.dark.push(callBack[,"callBackName"]) 传入触发器回调函数
+  utils.dark.method = {
+    toggle: new RunItem(),
+  };
+  utils.dark = Object.assign(utils.dark, {
+    push: utils.dark.method.toggle.push,
+  });
+</script>
+<script>
+  const sidebar = {
+    leftbar: () => {
+      if (l_body) {
+        l_body.toggleAttribute('leftbar');
+        l_body.removeAttribute('rightbar');
+      }
+    },
+    rightbar: () => {
+      if (l_body) {
+        l_body.toggleAttribute('rightbar');
+        l_body.removeAttribute('leftbar');
+      }
+    },
+    dismiss: () => {
+      if (l_body) {
+        l_body.removeAttribute('leftbar');
+        l_body.removeAttribute('rightbar');
+      }
+    },
+    toggleTOC: () => {
+      document.querySelector('#data-toc').classList.toggle('collapse');
+    }
+  }
+</script>
+<script type="text/javascript">
+  (() => {
+    const tagSwitchers = document.querySelectorAll('.tag-subtree.parent-tag > a > .tag-switcher-wrapper')
+    for (const tagSwitcher of tagSwitchers) {
+      tagSwitcher.addEventListener('click', (e) => {
+        const parent = e.target.closest('.tag-subtree.parent-tag')
+        parent.classList.toggle('expanded')
+        e.preventDefault()
+      })
+    }
+
+    // Get active tag from query string, then activate it.
+    const urlParams = new URLSearchParams(window.location.search)
+    const activeTag = urlParams.get('tag')
+    if (activeTag) {
+      let tag = document.querySelector(`.tag-subtree[data-tag="${activeTag}"]`)
+      if (tag) {
+        tag.querySelector('a').classList.add('active')
+        
+        while (tag) {
+          tag.classList.add('expanded')
+          tag = tag.parentElement.closest('.tag-subtree.parent-tag')
+        }
+      }
+    }
+  })()
+</script>
+
+<script async src="https://gcore.jsdelivr.net/npm/vanilla-lazyload@19.1/dist/lazyload.min.js"></script>
+<script>
+  // https://www.npmjs.com/package/vanilla-lazyload
+  // Set the options globally
+  // to make LazyLoad self-initialize
+  window.lazyLoadOptions = {
+    elements_selector: ".lazy",
+    callback_loaded: (el) => {
+      el.classList.add('loaded');
+      const wrapper = el.closest('.lazy-box');
+      const icon = wrapper?.querySelector('.lazy-icon');
+      if (icon) icon.remove();
+    }
+  };
+  // Listen to the initialization event
+  // and get the instance of LazyLoad
+  window.addEventListener(
+    "LazyLoad::Initialized",
+    function (event) {
+      window.lazyLoadInstance = event.detail.instance;
+    },
+    false
+  );
+  document.addEventListener('DOMContentLoaded', function () {
+    window.lazyLoadInstance?.update();
+  });
+
+  window.wrapLazyloadImages = (container) => {
+    if (typeof container === 'string') {
+      container = document.querySelector(container);
+    }
+    if (!container) return;
+    
+    const images = container.querySelectorAll('img');
+    images.forEach((img) => {
+      if (img.classList.contains('lazy')) return;
+
+      const src = img.getAttribute('src');
+      if (!src) return;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'lazy-box';
+
+      const newImg = img.cloneNode();
+      newImg.removeAttribute('src');
+      newImg.setAttribute('data-src', src);
+      newImg.classList.add('lazy');
+
+      const icon = document.createElement('div');
+      icon.className = 'lazy-icon';
+      if (def.loading) {
+        icon.style.backgroundImage = `url("${def.loading}")`;
+      }
+
+      wrapper.appendChild(newImg);
+      wrapper.appendChild(icon);
+
+      img.replaceWith(wrapper);
+    });
+
+    // 通知 LazyLoad 更新
+    if (window.lazyLoadInstance?.update) {
+      window.lazyLoadInstance.update();
+    }
+  }
+  
+</script>
+
+<!-- required -->
+<script src="/js/main.js?v=1.33.1" defer></script>
+
+<script type="text/javascript">
+  const applyTheme = (theme) => {
+    if (theme === 'auto') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', theme)
+    }
+
+    // applyThemeToGiscus(theme)
+  }
+
+  // FIXME: 这会导致无法使用 preferred_color_scheme 以外的主题
+  const applyThemeToGiscus = (theme) => {
+    // theme = theme === 'auto' ? 'preferred_color_scheme' : theme
+    const cmt = document.getElementById('giscus')
+    if (cmt) {
+      // This works before giscus load.
+      cmt.setAttribute('data-theme', theme)
+    }
+
+    const iframe = document.querySelector('#comments > section.giscus > iframe')
+    if (iframe) {
+      // This works after giscus loaded.
+      const src = iframe.src
+      const newSrc = src.replace(/theme=[\w]+/, `theme=${theme}`)
+      iframe.src = newSrc
+    }
+  }
+
+  const switchTheme = () => {
+    // light -> dark -> auto -> light -> ...
+    const currentTheme = document.documentElement.getAttribute('data-theme')
+    let newTheme;
+    switch (currentTheme) {
+      case 'light':
+        newTheme = 'dark'
+        break
+      case 'dark':
+        newTheme = 'auto'
+        break
+      default:
+        newTheme = 'light'
+    }
+    applyTheme(newTheme)
+    window.localStorage.setItem('Stellar.theme', newTheme)
+    utils.dark.mode = newTheme === 'auto' ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : newTheme;
+    utils.dark.method.toggle.start();
+
+    const messages = {
+      light: `切换到浅色模式`,
+      dark: `切换到深色模式`,
+      auto: `切换到跟随系统配色`,
+    }
+    hud?.toast?.(messages[newTheme])
+  }
+
+  (() => {
+    // Apply user's preferred theme, if any.
+    const theme = window.localStorage.getItem('Stellar.theme')
+    if (theme !== null) {
+      applyTheme(theme)
+    } else {
+      utils.dark.mode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    utils.dark.method.toggle.start();
+  })()
+</script>
+
+
+<!-- optional -->
+
+  <script type="module">
+  const el = document.querySelector('#comments #giscus');
+  util.viewportLazyload(el, load_discus, false);
+
+  function load_discus() {
+    if (!el) return;
+    try {
+        el.innerHTML = '';
+      } catch (error) {
+        console.error(error);
+      }
+      const script = document.createElement('script');
+      script.async = true;
+      for (const key of Object.keys(el.attributes)) {
+        const attr = el.attributes[key];
+        if (['class', 'id'].includes(attr.name) === false) {
+          script.setAttribute(attr.name, attr.value);
+        }
+      }
+      el.appendChild(script);
+  }
+</script>
+
+
+
+
+<script defer>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    ctx.services = Object.assign({}, JSON.parse(`{"mdrender":{"js":"/js/services/mdrender.js"},"siteinfo":{"js":"/js/services/siteinfo.js","api":null},"ghinfo":{"js":"/js/services/ghinfo.js"},"rating":{"js":"/js/services/rating.js","api":"https://star-vote.xaox.cc/api/rating"},"vote":{"js":"/js/services/vote.js","api":"https://star-vote.xaox.cc/api/vote"},"sites":{"js":"/js/services/sites.js"},"friends":{"js":"/js/services/friends.js"},"friends_and_posts":{"js":"/js/services/friends_and_posts.js"},"timeline":{"js":"/js/services/timeline.js"},"fcircle":{"js":"/js/services/fcircle.js"},"weibo":{"js":"/js/services/weibo.js"},"memos":{"js":"/js/services/memos.js"},"voice":{"js":"/js/plugins/voice.js"},"video":{"js":"/js/plugins/video.js"},"download-file":{"js":"/js/plugins/download-file.js"},"twikoo":{"js":"/js/services/twikoo_latest_comment.js"},"waline":{"js":"/js/services/waline_latest_comment.js"},"artalk":{"js":"/js/services/artalk_latest_comment.js"},"giscus":{"js":"/js/services/giscus_latest_comment.js"},"contributors":{"edit_this_page":{"_posts/":null,"wiki/stellar/":"https://github.com/xaoxuu/hexo-theme-stellar-docs/blob/main/"},"js":"/js/services/contributors.js"}}`));
+    for (let id of Object.keys(ctx.services)) {
+      const js = ctx.services[id].js;
+      if (id == 'siteinfo') {
+        ctx.cardlinks = document.querySelectorAll('a.link-card[cardlink]');
+        if (ctx.cardlinks?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            setCardLink(ctx.cardlinks);
+          });
+        }
+      } else if (id == 'voice') {
+        ctx.voiceAudios = document.querySelectorAll('.voice>audio');
+        if (ctx.voiceAudios?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            createVoiceDom(ctx.voiceAudios);
+          });
+        }
+      } else if (id == 'video') {
+        ctx.videos = document.querySelectorAll('.video>video');
+        if (ctx.videos?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            videoEvents(ctx.videos);
+          });
+        }
+      } else if (id == 'download-file') {
+        ctx.files = document.querySelectorAll('.file');
+        if (ctx.files?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            downloadFileEvent(ctx.files);
+          });
+        }
+      } else {
+        const els = document.getElementsByClassName(`ds-${id}`);
+        if (els?.length > 0) {
+          utils.jq(() => {
+            if (id == 'timeline' || 'memos' || 'marked') {
+              utils.js(deps.marked).then(function () {
+                utils.js(js, { defer: true });
+              });
+            } else {
+              utils.js(js, { defer: true });
+            }
+          });
+        }
+      }
+    }
+
+    // chat iphone time
+    let phoneTimes = document.querySelectorAll('.chat .status-bar .time');
+
+    if (phoneTimes.length > 0) {
+      NowTime();
+      var date = new Date();
+      var sec = date.getSeconds();
+      var firstAdjustInterval = setInterval(firstAdjustTime, 1000 * (60 - sec));
+    }
+
+    function firstAdjustTime() {
+      NowTime();
+      clearInterval(firstAdjustInterval);
+      setInterval(NowTime, 1000 * 60);
+    }
+
+    function NowTime() {
+      for (let i = 0; i < phoneTimes.length; ++i) {
+        var timeSpan = phoneTimes[i];
+        var date = new Date();
+        var hour = date.getHours();
+        var min = date.getMinutes();
+        timeSpan.innerHTML = check(hour) + ":" + check(min);
+      }
+    };
+
+    function check(val) {
+      if (val < 10) {
+        return ("0" + val);
+      }
+      return (val);
+    }
+
+    // chat quote
+    const chat_quote_obverser = new IntersectionObserver((entries, observer) => {
+      entries.filter((entry) => { return entry.isIntersecting }).sort((a, b) => a.intersectionRect.y !== b.intersectionRect.y ? a.intersectionRect.y - b.intersectionRect.y : a.intersectionRect.x - b.intersectionRect.x).forEach((entry, index) => {
+          observer.unobserve(entry.target);
+          setTimeout(() => {
+            entry.target.classList.add('quote-blink');
+            setTimeout(() => {
+              entry.target.classList.remove('quote-blink');
+            }, 1000);
+          }, Math.max(100, 16) * (index + 1));
+        });
+    });
+
+    var chatQuotes = document.querySelectorAll(".chat .talk .quote");
+    chatQuotes.forEach((quote) => {
+      quote.addEventListener('click', function () {
+        var chatCellDom = document.getElementById("quote-" + quote.getAttribute("quotedCellTag"));
+        if (chatCellDom) {
+          var chatDiv = chatCellDom.parentElement;
+          var mid = chatDiv.clientHeight / 2;
+          var offsetTop = chatCellDom.offsetTop;
+          if (offsetTop > mid - chatCellDom.clientHeight / 2) {
+            chatDiv.scrollTo({
+              top: chatCellDom.offsetTop - mid + chatCellDom.clientHeight / 2,
+              behavior: "smooth"
+            });
+          } else {
+            chatDiv.scrollTo({
+              top: 0,
+              behavior: "smooth"
+            });
+          }
+          chat_quote_obverser.observe(chatCellDom);
+        }
+      });
+    });
+  });
+</script>
+
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    ctx.search = {
+      path: `/search.json`,
+    }
+    utils.js('/js/search/local-search.js', { defer: true });
+  });
+</script><script>
+  window.FPConfig = {
+    delay: 0,
+    ignoreKeywords: [],
+    maxRPS: 5,
+    hoverDelay: 25
+  };
+</script>
+<script defer src="https://gcore.jsdelivr.net/npm/flying-pages@2/flying-pages.min.js"></script><script>
+  ctx.fancybox = {
+    selector: `.timenode p>img`,
+    css: `https://gcore.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css`,
+    js: `https://gcore.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js`
+  };
+  var selector = '[data-fancybox]:not(.error), .with-fancybox .atk-content img:not([atk-emoticon])';
+  if (ctx.fancybox.selector) {
+    selector += `, ${ctx.fancybox.selector}`
+  }
+  var needFancybox = document.querySelectorAll(selector).length !== 0;
+  if (!needFancybox) {
+    const memos = document.getElementsByClassName('ds-memos');
+    if (memos != undefined && memos.length > 0) {
+      needFancybox = true;
+    }
+    const fancybox = document.getElementsByClassName('with-fancybox');
+    if (fancybox != undefined && fancybox.length > 0) {
+      needFancybox = true;
+    }
+  }
+  if (needFancybox) {
+    utils.css(ctx.fancybox.css);
+    utils.js(ctx.fancybox.js, { defer: true }).then(function () {
+      Fancybox.bind(selector, {
+        hideScrollbar: false,
+        Thumbs: {
+          autoStart: false,
+        },
+        caption: (fancybox, slide) => {
+          return slide.triggerEl.alt || slide.triggerEl.dataset.caption || null
+        }
+      });
+    })
+  }
+</script>
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    const swiper_api = document.getElementById('swiper-api');
+    if (swiper_api != undefined) {
+      utils.css(`https://unpkg.com/swiper@10.3/swiper-bundle.min.css`);
+      utils.js(`https://unpkg.com/swiper@10.3/swiper-bundle.min.js`, { defer: true }).then(function () {
+        const effect = swiper_api.getAttribute('effect') || '';
+        var swiper = new Swiper('.swiper#swiper-api', {
+          slidesPerView: 'auto',
+          spaceBetween: 8,
+          centeredSlides: true,
+          effect: effect,
+          rewind: true,
+          pagination: {
+            el: '.swiper-pagination',
+            clickable: true,
+          },
+          navigation: {
+            nextEl: '.swiper-button-next',
+            prevEl: '.swiper-button-prev',
+          },
+        });
+      })
+    }
+  });
+</script>
+
+<script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.6/MathJax.js?config=TeX-AMS-MML_HTMLorMML" async></script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+  MathJax.Hub.Config({
+    tex2jax: {
+      skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    }
+  });
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    window.codeElements = document.querySelectorAll('.code');
+    if (window.codeElements.length > 0) {
+      ctx.copycode = {
+        default_text: `Copy`,
+        success_text: `Copied`,
+        toast: `复制成功`,
+      };
+      utils.js('/js/plugins/copycode.js');
+    }
+  });
+</script>
+
+
+<!-- inject -->
+
+</div></body></html>

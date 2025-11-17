@@ -1,0 +1,2373 @@
+
+<!DOCTYPE html><html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="hexo-theme" content="https://github.com/xaoxuu/hexo-theme-stellar/tree/1.33.1" theme-name="Stellar" theme-version="1.33.1">
+  
+  
+  <meta name="generator" content="Hexo 7.3.0">
+  <meta http-equiv='x-dns-prefetch-control' content='on' />
+  
+  <meta name="renderer" content="webkit">
+  <meta name="force-rendering" content="webkit">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+  <meta name="HandheldFriendly" content="True" >
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000">
+  <meta name="theme-color" content="#f9fafb">
+  <title>HCCL 集合通信库设计分析 - My Blog</title>
+
+  
+    <meta name="description" content="HCCL是基于昇腾AI处理器的高性能集合通信库，为单机多卡及多机多卡环境提供高效的数据并行和模型并行集合通信方案。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="HCCL 集合通信库设计分析">
+<meta property="og:url" content="https://nash635.github.io/2025/11/17/HCCL_DeepDive/">
+<meta property="og:site_name" content="My Blog">
+<meta property="og:description" content="HCCL是基于昇腾AI处理器的高性能集合通信库，为单机多卡及多机多卡环境提供高效的数据并行和模型并行集合通信方案。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-11-17T02:00:01.000Z">
+<meta property="article:modified_time" content="2025-11-17T14:42:49.978Z">
+<meta property="article:author" content="nash635">
+<meta property="article:tag" content="HCCL">
+<meta property="article:tag" content="集合通信">
+<meta property="article:tag" content="华为">
+<meta property="article:tag" content="昇腾">
+<meta property="article:tag" content="AllReduce">
+<meta name="twitter:card" content="summary">
+  
+  
+  
+  <meta name="keywords" content="HCCL,集合通信,华为,昇腾,AllReduce">
+
+  <!-- feed -->
+  
+
+  <link rel="stylesheet" href="/css/main.css?v=1.33.1">
+
+
+  
+
+  
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"nash635","sameAs":[]},"dateCreated":"2025-11-17T10:00:01+08:00","dateModified":"2025-11-17T22:42:49+08:00","datePublished":"2025-11-17T10:00:01+08:00","description":"","headline":"HCCL 集合通信库设计分析","mainEntityOfPage":{"@type":"WebPage","@id":"https://nash635.github.io/2025/11/17/HCCL_DeepDive/"},"publisher":{"@type":"Organization","name":"nash635","sameAs":[]},"url":"https://nash635.github.io/2025/11/17/HCCL_DeepDive/","keywords":"HCCL, 集合通信, 华为, 昇腾, AllReduce","image":[]}</script>
+  
+</head>
+<body>
+
+<div class="l_body content" id="start" layout="post" type="tech" ><aside class="l_left"><div class="sidebg"></div><div class="leftbar-container">
+
+
+<header class="header"><div class="logo-wrap"><a class="avatar" href="/"><div class="bg" style="opacity:0;background-image:url(https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/avatar/round/rainbow64@3x.webp);"></div><img no-lazy class="avatar" src="/img/avatar.png" onerror="javascript:this.classList.add('error');this.src='https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/image/2659360.svg';"></a><a class="title" href="/"><div class="main">nash635's Blog</div><div class="sub cap">造车，造船，造飞机</div></a></div></header>
+
+<div class="nav-area">
+
+<nav class="menu dis-select"></nav>
+</div>
+<div class="widgets">
+<div class="search-wrapper" id="search-wrapper"><form class="search-form"><a class="search-button" onclick="document.getElementById(&quot;search-input&quot;).focus();"><svg t="1705074644177" viewBox="0 0 1025 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1560" width="200" height="200"><path d="M1008.839137 935.96571L792.364903 719.491476a56.783488 56.783488 0 0 0-80.152866 0 358.53545 358.53545 0 1 1 100.857314-335.166073 362.840335 362.840335 0 0 1-3.689902 170.145468 51.248635 51.248635 0 1 0 99.217358 26.444296 462.057693 462.057693 0 1 0-158.255785 242.303546l185.930047 185.725053a51.248635 51.248635 0 0 0 72.568068 0 51.248635 51.248635 0 0 0 0-72.978056z" p-id="1561"></path><path d="M616.479587 615.969233a50.428657 50.428657 0 0 0-61.498362-5.534852 174.655348 174.655348 0 0 1-177.525271 3.484907 49.403684 49.403684 0 0 0-58.833433 6.76482l-3.074918 2.869923a49.403684 49.403684 0 0 0 8.609771 78.10292 277.767601 277.767601 0 0 0 286.992355-5.739847 49.403684 49.403684 0 0 0 8.404776-76.667958z" p-id="1562"></path></svg></a><input type="text" class="search-input" id="search-input" placeholder="站内搜索"></form><div id="search-result"></div><div class="search-no-result">没有找到内容！</div></div>
+
+
+
+<widget class="widget-wrapper recent post-list"><div class="widget-header dis-select"><span class="name">最近更新</span></div><div class="widget-body fs14"><a class="item title" href="/2025/11/17/HCCL_DeepDive/"><span class="title">HCCL 集合通信库设计分析</span></a><a class="item title" href="/2025/11/17/DeepEP_DeepDive/"><span class="title">DeepEP 架构分析</span></a><a class="item title" href="/2025/11/17/Megatron_DeepDive/"><span class="title">Megatron-LM 架构深度分析</span></a><a class="item title" href="/2025/11/17/TransformerEngine_DeepDive/"><span class="title">Transformer Engine 架构设计分析</span></a><a class="item title" href="/2025/07/24/Hello-World/"><span class="title">Hello World</span></a></div></widget>
+</div>
+
+</div></aside><div class="l_main" id="main">
+
+
+
+
+
+<div class="article banner top">
+  <div class="content">
+    <div class="top bread-nav footnote"><div class="left"><div class="flex-row" id="breadcrumb"><a class="cap breadcrumb" href="/">主页</a>
+<span class="sep"></span><a class="cap breadcrumb" href="/">文章</a><span class="sep"></span><a class="cap breadcrumb-link" href="/categories/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E5%88%86%E6%9E%90/">系统架构分析</a></div>
+<div class="flex-row" id="post-meta"><span class="text created">发布于：<time datetime="2025-11-17T02:00:01.000Z">2025-11-17</time></span><span class="sep updated"></span><span class="text updated">更新于：<time datetime="2025-11-17T14:42:49.978Z">2025-11-17</time></span></div></div></div>
+    
+    <div class="bottom only-title">
+      
+      <div class="text-area">
+        <h1 class="text title"><span>HCCL 集合通信库设计分析</span></h1>
+        
+      </div>
+    </div>
+    
+  </div>
+  </div><article class="md-text content"><h1 id="HCCL-Huawei-Collective-Communication-Library-设计文档"><a href="#HCCL-Huawei-Collective-Communication-Library-设计文档" class="headerlink" title="HCCL (Huawei Collective Communication Library) 设计文档"></a>HCCL (Huawei Collective Communication Library) 设计文档</h1><h2 id="1-项目概述"><a href="#1-项目概述" class="headerlink" title="1. 项目概述"></a>1. 项目概述</h2><h3 id="1-1-项目简介"><a href="#1-1-项目简介" class="headerlink" title="1.1 项目简介"></a>1.1 项目简介</h3><p>HCCL（Huawei Collective Communication Library，华为集合通信库）是基于昇腾AI处理器的高性能集合通信库，为单机多卡及多机多卡环境提供高效的数据并行和模型并行集合通信方案。</p>
+<p>开源代码库：<a target="_blank" rel="noopener" href="https://gitee.com/ascend/cann-hccl">https://gitee.com/ascend/cann-hccl</a></p>
+<p><strong>版本信息：</strong> 配套CANN软件版本发行</p>
+<p><strong>许可证：</strong> CANN Open Software License Agreement Version 1.0</p>
+<h3 id="1-2-核心特性"><a href="#1-2-核心特性" class="headerlink" title="1.2 核心特性"></a>1.2 核心特性</h3><ul>
+<li>✅ <strong>高性能通信算法</strong>：支持9种拓扑算法（Mesh、Ring、RHD、PairWise、Star、NHR、NB、AHC、Pipeline）</li>
+<li>✅ <strong>灵活的通信模式</strong>：支持单机多卡和多机多卡场景</li>
+<li>✅ <strong>智能算法选择</strong>：根据通信域信息和数据量自动选择最优算法</li>
+<li>✅ <strong>分层网络优化</strong>：支持Server内和Server间分级通信</li>
+<li>✅ <strong>多种集合操作</strong>：AllReduce、AllGather、ReduceScatter、Broadcast等</li>
+</ul>
+<h3 id="1-3-系统架构"><a href="#1-3-系统架构" class="headerlink" title="1.3 系统架构"></a>1.3 系统架构</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;适配层&quot;</span><br><span class="line">        A[图引擎适配] --&gt; B[单算子适配]</span><br><span class="line">        B --&gt; C[通信切分优化]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;集合通信业务层&quot;</span><br><span class="line">        D[通信框架模块]</span><br><span class="line">        E[通信算法模块]</span><br><span class="line">        </span><br><span class="line">        D --&gt; D1[通信域管理]</span><br><span class="line">        D --&gt; D2[算子业务串联]</span><br><span class="line">        D --&gt; D3[算法选择]</span><br><span class="line">        D --&gt; D4[资源申请]</span><br><span class="line">        D --&gt; D5[任务下发]</span><br><span class="line">        </span><br><span class="line">        E --&gt; E1[Mesh算法]</span><br><span class="line">        E --&gt; E2[Ring算法]</span><br><span class="line">        E --&gt; E3[RHD算法]</span><br><span class="line">        E --&gt; E4[PairWise算法]</span><br><span class="line">        E --&gt; E5[Star算法]</span><br><span class="line">        E --&gt; E6[NHR算法]</span><br><span class="line">        E --&gt; E7[NB算法]</span><br><span class="line">        E --&gt; E8[AHC算法]</span><br><span class="line">        E --&gt; E9[Pipeline算法]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;集合通信平台层&quot;</span><br><span class="line">        F[资源抽象]</span><br><span class="line">        G[维测能力]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    C --&gt; D</span><br><span class="line">    D &lt;--&gt; E</span><br><span class="line">    D --&gt; F</span><br><span class="line">    F --&gt; G</span><br><span class="line">    </span><br><span class="line">    style D fill:#e1d5e7</span><br><span class="line">    style E fill:#e1d5e7</span><br><span class="line">    style D1 fill:#fff2cc</span><br><span class="line">    style D2 fill:#fff2cc</span><br><span class="line">    style D3 fill:#fff2cc</span><br><span class="line">    style D4 fill:#fff2cc</span><br><span class="line">    style D5 fill:#fff2cc</span><br></pre></td></tr></table></figure>
+
+<h2 id="2-核心架构设计"><a href="#2-核心架构设计" class="headerlink" title="2. 核心架构设计"></a>2. 核心架构设计</h2><h3 id="2-1-三层架构模型"><a href="#2-1-三层架构模型" class="headerlink" title="2.1 三层架构模型"></a>2.1 三层架构模型</h3><p>HCCL采用分层设计，从上到下分为三个核心层次：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    A[适配层] --&gt; B[业务层]</span><br><span class="line">    B --&gt; C[平台层]</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;本源码仓实现范围&quot;</span><br><span class="line">        B1[通信框架]</span><br><span class="line">        B2[通信算法]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    B -.包含.-&gt; B1</span><br><span class="line">    B -.包含.-&gt; B2</span><br><span class="line">    </span><br><span class="line">    style B1 fill:#e1d5e7</span><br><span class="line">    style B2 fill:#e1d5e7</span><br></pre></td></tr></table></figure>
+
+<h4 id="2-1-1-适配层"><a href="#2-1-1-适配层" class="headerlink" title="2.1.1 适配层"></a>2.1.1 适配层</h4><p><strong>职责：</strong></p>
+<ul>
+<li>图引擎与单算子的对接适配</li>
+<li>通信操作的切分与优化</li>
+<li>任务分发策略制定</li>
+</ul>
+<h4 id="2-1-2-集合通信业务层（本仓核心）"><a href="#2-1-2-集合通信业务层（本仓核心）" class="headerlink" title="2.1.2 集合通信业务层（本仓核心）"></a>2.1.2 集合通信业务层（本仓核心）</h4><p><strong>通信框架模块：</strong></p>
+<ul>
+<li>通信域（Communicator）生命周期管理</li>
+<li>集合通信算子的业务流程编排</li>
+<li>算法选择策略与调度</li>
+<li>与平台层协作完成资源申请</li>
+<li>任务下发与执行管理</li>
+</ul>
+<p><strong>通信算法模块：</strong></p>
+<ul>
+<li>实现9种核心集合通信算法</li>
+<li>资源消耗计算与评估</li>
+<li>基于通信域信息的任务编排</li>
+<li>算法性能模型（α-β模型）实现</li>
+</ul>
+<h4 id="2-1-3-集合通信平台层"><a href="#2-1-3-集合通信平台层" class="headerlink" title="2.1.3 集合通信平台层"></a>2.1.3 集合通信平台层</h4><p><strong>职责：</strong></p>
+<ul>
+<li>NPU硬件资源抽象与管理</li>
+<li>HCCS链路资源管理</li>
+<li>通信日志与性能监控</li>
+<li>错误诊断与恢复机制</li>
+</ul>
+<h3 id="2-2-目录结构"><a href="#2-2-目录结构" class="headerlink" title="2.2 目录结构"></a>2.2 目录结构</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">cann-hccl/</span><br><span class="line">├── src/domain/collective_communication/</span><br><span class="line">│   ├── algorithm/          # 通信算法实现</span><br><span class="line">│   └── framework/          # 通信框架实现</span><br><span class="line">├── inc/hccl/              # 对外头文件</span><br><span class="line">│   ├── hccl.h</span><br><span class="line">│   └── hccl_types.h</span><br><span class="line">├── docs/                   # 算法原理文档</span><br><span class="line">├── test/                   # 测试代码</span><br><span class="line">├── cmake/                  # 编译配置</span><br><span class="line">└── build.sh               # 编译脚本</span><br></pre></td></tr></table></figure>
+
+<h2 id="3-集合通信算法详解"><a href="#3-集合通信算法详解" class="headerlink" title="3. 集合通信算法详解"></a>3. 集合通信算法详解</h2><p>HCCL的核心竞争力在于其丰富的集合通信算法库，针对不同的网络拓扑、节点规模和数据量提供最优解决方案。</p>
+<h3 id="3-1-性能评估模型"><a href="#3-1-性能评估模型" class="headerlink" title="3.1 性能评估模型"></a>3.1 性能评估模型</h3><p>HCCL采用 <strong>α-β模型（Hockney模型）</strong> 进行性能评估：</p>
+<p>$$<br>T &#x3D; \alpha + n\beta + n\gamma<br>$$</p>
+<p><strong>参数说明：</strong></p>
+<ul>
+<li><strong>α</strong>：节点间的固定时延（启动开销）</li>
+<li><strong>β</strong>：每byte数据传输耗时（带宽倒数）</li>
+<li><strong>n</strong>：通信数据大小（bytes）</li>
+<li><strong>γ</strong>：每byte数据规约计算耗时</li>
+<li><strong>p</strong>：通信域节点个数</li>
+</ul>
+<h3 id="3-2-Mesh-算法"><a href="#3-2-Mesh-算法" class="headerlink" title="3.2 Mesh 算法"></a>3.2 Mesh 算法</h3><h4 id="3-2-1-算法原理"><a href="#3-2-1-算法原理" class="headerlink" title="3.2.1 算法原理"></a>3.2.1 算法原理</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    N0((Rank0)) ---|全连接| N1((Rank1))</span><br><span class="line">    N0 ---|全连接| N2((Rank2))</span><br><span class="line">    N0 ---|全连接| N3((Rank3))</span><br><span class="line">    N1 ---|全连接| N2</span><br><span class="line">    N1 ---|全连接| N3</span><br><span class="line">    N2 ---|全连接| N3</span><br><span class="line">    </span><br><span class="line">    style N0 fill:#ffcccc</span><br><span class="line">    style N1 fill:#ccffcc</span><br><span class="line">    style N2 fill:#ccccff</span><br><span class="line">    style N3 fill:#ffffcc</span><br></pre></td></tr></table></figure>
+
+<p><strong>特点：</strong></p>
+<ul>
+<li><strong>拓扑：</strong> FullMesh互联，NPU间全连接</li>
+<li><strong>时间复杂度：</strong> O(1)</li>
+<li><strong>适用场景：</strong> Server内通信，小规模集群</li>
+<li><strong>优势：</strong> 一步完成通信，延迟最低</li>
+<li><strong>劣势：</strong> 资源开销大，难以扩展到大规模</li>
+</ul>
+<h4 id="3-2-2-执行流程示例（以AllReduce为例）"><a href="#3-2-2-执行流程示例（以AllReduce为例）" class="headerlink" title="3.2.2 执行流程示例（以AllReduce为例）"></a>3.2.2 执行流程示例（以AllReduce为例）</h4><p><strong>说明：</strong> Mesh算法支持所有集合通信原语（AllReduce、AllGather、ReduceScatter、Broadcast、Reduce、Scatter、Gather等），此处以AllReduce为典型示例展示执行流程。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line">sequenceDiagram</span><br><span class="line">    participant R0 as Rank0</span><br><span class="line">    participant R1 as Rank1</span><br><span class="line">    participant R2 as Rank2</span><br><span class="line">    participant R3 as Rank3</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Phase 1: ReduceScatter (并发)</span><br><span class="line">    Note over R0,R3: 每个节点将数据切分为p份，并发发送给所有其他节点</span><br><span class="line">    R0-&gt;&gt;R1: 发送chunk_1</span><br><span class="line">    R0-&gt;&gt;R2: 发送chunk_2</span><br><span class="line">    R0-&gt;&gt;R3: 发送chunk_3</span><br><span class="line">    R1-&gt;&gt;R0: 发送chunk_0</span><br><span class="line">    R1-&gt;&gt;R2: 发送chunk_2</span><br><span class="line">    R1-&gt;&gt;R3: 发送chunk_3</span><br><span class="line">    R2-&gt;&gt;R0: 发送chunk_0</span><br><span class="line">    R2-&gt;&gt;R1: 发送chunk_1</span><br><span class="line">    R2-&gt;&gt;R3: 发送chunk_3</span><br><span class="line">    R3-&gt;&gt;R0: 发送chunk_0</span><br><span class="line">    R3-&gt;&gt;R1: 发送chunk_1</span><br><span class="line">    R3-&gt;&gt;R2: 发送chunk_2</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Phase 2: 本地Reduce</span><br><span class="line">    Note over R0: 规约chunk_0</span><br><span class="line">    Note over R1: 规约chunk_1</span><br><span class="line">    Note over R2: 规约chunk_2</span><br><span class="line">    Note over R3: 规约chunk_3</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Phase 3: AllGather (并发)</span><br><span class="line">    Note over R0,R3: 每个节点并发向所有其他节点发送自己的规约结果</span><br><span class="line">    R0-&gt;&gt;R1: 广播chunk_0*</span><br><span class="line">    R0-&gt;&gt;R2: 广播chunk_0*</span><br><span class="line">    R0-&gt;&gt;R3: 广播chunk_0*</span><br><span class="line">    R1-&gt;&gt;R0: 广播chunk_1*</span><br><span class="line">    R1-&gt;&gt;R2: 广播chunk_1*</span><br><span class="line">    R1-&gt;&gt;R3: 广播chunk_1*</span><br><span class="line">    R2-&gt;&gt;R0: 广播chunk_2*</span><br><span class="line">    R2-&gt;&gt;R1: 广播chunk_2*</span><br><span class="line">    R2-&gt;&gt;R3: 广播chunk_2*</span><br><span class="line">    R3-&gt;&gt;R0: 广播chunk_3*</span><br><span class="line">    R3-&gt;&gt;R1: 广播chunk_3*</span><br><span class="line">    R3-&gt;&gt;R2: 广播chunk_3*</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: 所有节点持有完整规约结果</span><br></pre></td></tr></table></figure>
+
+<p><strong>执行流程详细描述：</strong></p>
+<p><strong>Phase 1: ReduceScatter（并发执行）</strong></p>
+<ul>
+<li><strong>数据准备</strong>: 每个节点将自己的n字节数据切分为p个chunk，每个chunk大小为n&#x2F;p字节</li>
+<li><strong>并发发送</strong>: <ul>
+<li>Rank0保留chunk_0，将chunk_1发送给Rank1，chunk_2发送给Rank2，chunk_3发送给Rank3</li>
+<li>Rank1保留chunk_1，将chunk_0发送给Rank0，chunk_2发送给Rank2，chunk_3发送给Rank3</li>
+<li>Rank2保留chunk_2，将chunk_0发送给Rank0，chunk_1发送给Rank1，chunk_3发送给Rank3</li>
+<li>Rank3保留chunk_3，将chunk_0发送给Rank0，chunk_1发送给Rank1，chunk_2发送给Rank2</li>
+</ul>
+</li>
+<li><strong>通信特点</strong>: 全连接并发，所有通信同时进行，利用FullMesh拓扑的双向带宽</li>
+</ul>
+<p><strong>Phase 2: 本地Reduce（本地计算）</strong></p>
+<ul>
+<li>Rank0对接收到的所有chunk_0进行规约：chunk_0* &#x3D; chunk_0(R0) + chunk_0(R1) + chunk_0(R2) + chunk_0(R3)</li>
+<li>Rank1对接收到的所有chunk_1进行规约：chunk_1* &#x3D; chunk_1(R0) + chunk_1(R1) + chunk_1(R2) + chunk_1(R3)</li>
+<li>Rank2对接收到的所有chunk_2进行规约：chunk_2* &#x3D; chunk_2(R0) + chunk_2(R1) + chunk_2(R2) + chunk_2(R3)</li>
+<li>Rank3对接收到的所有chunk_3进行规约：chunk_3* &#x3D; chunk_3(R0) + chunk_3(R1) + chunk_3(R2) + chunk_3(R3)</li>
+<li>此时每个节点持有1&#x2F;p的完整规约结果</li>
+</ul>
+<p><strong>Phase 3: AllGather（并发执行）</strong></p>
+<ul>
+<li><strong>并发广播</strong>: <ul>
+<li>Rank0将chunk_0*并发发送给Rank1, Rank2, Rank3</li>
+<li>Rank1将chunk_1*并发发送给Rank0, Rank2, Rank3</li>
+<li>Rank2将chunk_2*并发发送给Rank0, Rank1, Rank3</li>
+<li>Rank3将chunk_3*并发发送给Rank0, Rank1, Rank2</li>
+</ul>
+</li>
+<li><strong>最终状态</strong>: 所有节点持有完整的规约结果[chunk_0*, chunk_1*, chunk_2*, chunk_3*]</li>
+<li><strong>通信特点</strong>: 全连接并发，充分利用FullMesh拓扑的所有链路</li>
+</ul>
+<p><strong>其他原语：</strong></p>
+<ul>
+<li><strong>AllGather</strong>: 直接执行Phase 3（并发收集所有节点数据）</li>
+<li><strong>ReduceScatter</strong>: 执行Phase 1 + Phase 2（并发规约后分散）</li>
+<li><strong>Broadcast</strong>: 根节点向所有节点并发发送完整数据</li>
+<li><strong>Gather</strong>: 所有节点向根节点并发发送数据</li>
+</ul>
+<h4 id="3-2-3-性能模型"><a href="#3-2-3-性能模型" class="headerlink" title="3.2.3 性能模型"></a>3.2.3 性能模型</h4><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>耗时公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scatter</td>
+<td>$\alpha + \frac{1}{p}n\beta$</td>
+<td>一步完成，根节点向p个节点并发发送，每节点接收n&#x2F;p数据</td>
+</tr>
+<tr>
+<td>Gather</td>
+<td>$\alpha + \frac{1}{p}n\beta$</td>
+<td>一步完成，p个节点向根节点并发发送，根节点接收全部数据</td>
+</tr>
+<tr>
+<td>Broadcast</td>
+<td>$2\alpha + \frac{2}{p}n\beta$</td>
+<td>Scatter + AllGather实现（两步），每步传输部分数据</td>
+</tr>
+<tr>
+<td>Reduce</td>
+<td>$2\alpha + \frac{2}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>ReduceScatter + Gather实现，需规约所有输入数据</td>
+</tr>
+<tr>
+<td>ReduceScatter</td>
+<td>$\alpha + \frac{1}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>一步完成，并发规约并分发，每节点接收n&#x2F;p结果</td>
+</tr>
+<tr>
+<td>AllGather</td>
+<td>$\alpha + \frac{1}{p}n\beta$</td>
+<td>一步完成，全连接并发传输，每节点发送n&#x2F;p数据</td>
+</tr>
+<tr>
+<td>AllReduce</td>
+<td>$2\alpha + \frac{2}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>ReduceScatter + AllGather两阶段，总共两步通信</td>
+</tr>
+</tbody></table>
+<h3 id="3-3-Ring-算法"><a href="#3-3-Ring-算法" class="headerlink" title="3.3 Ring 算法"></a>3.3 Ring 算法</h3><h4 id="3-3-1-算法原理"><a href="#3-3-1-算法原理" class="headerlink" title="3.3.1 算法原理"></a>3.3.1 算法原理</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    R0((Rank0)) --&gt;|右手卡| R1((Rank1))</span><br><span class="line">    R1 --&gt;|右手卡| R2((Rank2))</span><br><span class="line">    R2 --&gt;|右手卡| R3((Rank3))</span><br><span class="line">    R3 --&gt;|右手卡| R0</span><br><span class="line">    </span><br><span class="line">    R0 -.-&gt;|左手卡| R3</span><br><span class="line">    R1 -.-&gt;|左手卡| R0</span><br><span class="line">    R2 -.-&gt;|左手卡| R1</span><br><span class="line">    R3 -.-&gt;|左手卡| R2</span><br><span class="line">    </span><br><span class="line">    style R0 fill:#ffcccc</span><br><span class="line">    style R1 fill:#ccffcc</span><br><span class="line">    style R2 fill:#ccccff</span><br><span class="line">    style R3 fill:#ffffcc</span><br></pre></td></tr></table></figure>
+
+<p><strong>特点：</strong></p>
+<ul>
+<li><strong>拓扑：</strong> 环形结构，每个节点只与左右邻居通信</li>
+<li><strong>时间复杂度：</strong> O(p-1) - 线性复杂度</li>
+<li><strong>适用场景：</strong> <ul>
+<li>Server内和Server间通信</li>
+<li>小规模集群或小数据量</li>
+<li>网络拥塞场景</li>
+<li>Pipeline不适用的场景</li>
+</ul>
+</li>
+</ul>
+<h4 id="3-3-2-执行流程示例（以AllReduce为例）"><a href="#3-3-2-执行流程示例（以AllReduce为例）" class="headerlink" title="3.3.2 执行流程示例（以AllReduce为例）"></a>3.3.2 执行流程示例（以AllReduce为例）</h4><p><strong>说明：</strong> Ring算法支持多种集合通信原语（AllReduce、AllGather、ReduceScatter、Broadcast、Reduce、Scatter、Gather等），此处以AllReduce为典型示例展示执行流程。</p>
+<h5 id="两阶段概览"><a href="#两阶段概览" class="headerlink" title="两阶段概览"></a>两阶段概览</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;阶段1: ReduceScatter (p-1步)&quot;</span><br><span class="line">        A1[数据切分为p块] --&gt; A2[沿环传输并规约]</span><br><span class="line">        A2 --&gt; A3[每个节点持有1/p规约结果]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;阶段2: AllGather (p-1步)&quot;</span><br><span class="line">        B1[每个节点持有1/p数据] --&gt; B2[沿环传输完整数据]</span><br><span class="line">        B2 --&gt; B3[所有节点获得完整结果]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    A3 --&gt; B1</span><br></pre></td></tr></table></figure>
+
+<h5 id="详细执行步骤（4节点示例）"><a href="#详细执行步骤（4节点示例）" class="headerlink" title="详细执行步骤（4节点示例）"></a>详细执行步骤（4节点示例）</h5><p><strong>阶段1: ReduceScatter（p-1&#x3D;3步完成）</strong></p>
+<p>Ring算法的ReduceScatter阶段：每个节点在每一步都向右邻居发送一个数据块，并接收左邻居的数据块进行规约。经过p-1步后，每个节点持有一个完整规约的数据块。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">sequenceDiagram</span><br><span class="line">    participant R0 as Rank0&lt;br/&gt;[A0,B0,C0,D0]</span><br><span class="line">    participant R1 as Rank1&lt;br/&gt;[A1,B1,C1,D1]</span><br><span class="line">    participant R2 as Rank2&lt;br/&gt;[A2,B2,C2,D2]</span><br><span class="line">    participant R3 as Rank3&lt;br/&gt;[A3,B3,C3,D3]</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Step 1: 每个节点向右发送一个块</span><br><span class="line">    R0-&gt;&gt;R1: D0</span><br><span class="line">    R1-&gt;&gt;R2: D1  </span><br><span class="line">    R2-&gt;&gt;R3: D2</span><br><span class="line">    R3-&gt;&gt;R0: D3</span><br><span class="line">    Note over R0: 接收D3，持有[A0,B0,C0,D0+D3]</span><br><span class="line">    Note over R1: 接收D0，持有[A1,B1,C1,D0+D1]</span><br><span class="line">    Note over R2: 接收D1，持有[A2,B2,C2+D1,D2]</span><br><span class="line">    Note over R3: 接收D2，持有[A3+D2,B3,C3,D3]</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Step 2: 继续向右发送刚规约的块</span><br><span class="line">    R0-&gt;&gt;R1: C0</span><br><span class="line">    R1-&gt;&gt;R2: D0+D1</span><br><span class="line">    R2-&gt;&gt;R3: C2+D1  </span><br><span class="line">    R3-&gt;&gt;R0: D2+D3</span><br><span class="line">    Note over R0: 接收D2+D3，持有[A0,B0,C0,D*]</span><br><span class="line">    Note over R1: 接收C0，持有[A1,B1,C0+C1,D*]</span><br><span class="line">    Note over R2: 接收D0+D1，持有[A2,B2,C*,D*]</span><br><span class="line">    Note over R3: 接收C2+D1，持有[A*,B3,C*,D3]</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Step 3: 最后一轮</span><br><span class="line">    R0-&gt;&gt;R1: B0</span><br><span class="line">    R1-&gt;&gt;R2: C0+C1</span><br><span class="line">    R2-&gt;&gt;R3: B2</span><br><span class="line">    R3-&gt;&gt;R0: C*</span><br><span class="line">    Note over R0: 接收C*，持有[A0,B0,C*,D*]</span><br><span class="line">    Note over R1: 接收B0，持有[A1,B0+B1,C*,D*]</span><br><span class="line">    Note over R2: 接收C0+C1，持有[A2,B*,C*,D2]</span><br><span class="line">    Note over R3: 接收B2，持有[A3,B2+B3,C3,D*]</span><br></pre></td></tr></table></figure>
+
+<p><strong>注意：</strong> 上述简化示例未完整展示。实际上ReduceScatter需要p-1&#x3D;3步，每步每个节点都在某个特定位置进行规约。最终：</p>
+<ul>
+<li>Rank0持有A块的完整规约结果A*</li>
+<li>Rank1持有B块的完整规约结果B*  </li>
+<li>Rank2持有C块的完整规约结果C*</li>
+<li>Rank3持有D块的完整规约结果D*</li>
+</ul>
+<p><strong>阶段2: AllGather（3步完成）</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">sequenceDiagram</span><br><span class="line">    participant R0 as Rank0</span><br><span class="line">    participant R1 as Rank1</span><br><span class="line">    participant R2 as Rank2</span><br><span class="line">    participant R3 as Rank3</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: 每个节点持有1/4规约结果</span><br><span class="line">    Note over R0: [A*,B*,-,-]</span><br><span class="line">    Note over R1: [-,B*,C*,-]</span><br><span class="line">    Note over R2: [-,-,C*,D*]</span><br><span class="line">    Note over R3: [A*,-,-,D*]</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Step 1: 沿环传输收集</span><br><span class="line">    R0-&gt;&gt;R1: A*</span><br><span class="line">    R1-&gt;&gt;R2: B*</span><br><span class="line">    R2-&gt;&gt;R3: C*</span><br><span class="line">    R3-&gt;&gt;R0: D*</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Step 2: 继续传输</span><br><span class="line">    R0-&gt;&gt;R1: D*</span><br><span class="line">    R1-&gt;&gt;R2: A*</span><br><span class="line">    R2-&gt;&gt;R3: B*</span><br><span class="line">    R3-&gt;&gt;R0: C*</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Step 3: 最后一轮</span><br><span class="line">    R0-&gt;&gt;R1: C*</span><br><span class="line">    R1-&gt;&gt;R2: D*</span><br><span class="line">    R2-&gt;&gt;R3: A*</span><br><span class="line">    R3-&gt;&gt;R0: B*</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: 所有节点持有完整结果[A*,B*,C*,D*]</span><br></pre></td></tr></table></figure>
+
+<p><strong>执行流程详细描述：</strong></p>
+<p><strong>阶段1: ReduceScatter（p-1&#x3D;3步完成）</strong></p>
+<p>Ring算法的核心思想：数据切分为p块，每个节点在每一步向右邻居发送一个块，从左邻居接收一个块并规约。经过p-1步后，每个节点持有一个完整规约的数据块。</p>
+<ul>
+<li><p><strong>初始状态</strong>: </p>
+<ul>
+<li>Rank0持有[A0, B0, C0, D0]</li>
+<li>Rank1持有[A1, B1, C1, D1]</li>
+<li>Rank2持有[A2, B2, C2, D2]</li>
+<li>Rank3持有[A3, B3, C3, D3]</li>
+</ul>
+</li>
+<li><p><strong>Step 1</strong>: </p>
+<ul>
+<li>发送：R0→D0→R1, R1→D1→R2, R2→D2→R3, R3→D3→R0</li>
+<li>规约：每个节点将接收的D块与本地D块规约</li>
+<li>结果：R0持有D0+D3, R1持有D0+D1, R2持有D1+D2, R3持有D2+D3</li>
+<li>数据流向：环形顺时针流动</li>
+</ul>
+</li>
+<li><p><strong>Step 2</strong>: </p>
+<ul>
+<li>发送：R0→C0→R1, R1→(D0+D1)→R2, R2→(C2+D1)→R3, R3→(D2+D3)→R0</li>
+<li>规约：每个节点将接收的块与本地对应块规约</li>
+<li>关键：R2完成D块的完整规约D* &#x3D; D0+D1+D2+D3</li>
+<li>数据流向：继续顺时针，规约块逐步完成</li>
+</ul>
+</li>
+<li><p><strong>Step 3</strong>: </p>
+<ul>
+<li>发送：R0→B0→R1, R1→(C0+C1)→R2, R2→B2→R3, R3→C*→R0</li>
+<li>规约：R0完成D*的接收，R1和R2完成更多规约</li>
+<li>注：完整算法需继续执行直到所有块规约完成</li>
+</ul>
+</li>
+<li><p><strong>最终状态</strong>（经过p-1步后）:</p>
+<ul>
+<li>Rank0持有A* &#x3D; A0+A1+A2+A3</li>
+<li>Rank1持有B* &#x3D; B0+B1+B2+B3</li>
+<li>Rank2持有C* &#x3D; C0+C1+C2+C3</li>
+<li>Rank3持有D* &#x3D; D0+D1+D2+D3</li>
+</ul>
+</li>
+</ul>
+<p><strong>阶段2: AllGather（p-1&#x3D;3步完成）</strong></p>
+<p>AllGather阶段的目标：将每个节点持有的唯一规约结果块收集到所有节点。</p>
+<ul>
+<li><p><strong>初始状态</strong>:</p>
+<ul>
+<li>Rank0持有[A*, -, -, -]（实际在位置0）</li>
+<li>Rank1持有[-, B*, -, -]（实际在位置1）</li>
+<li>Rank2持有[-, -, C*, -]（实际在位置2）</li>
+<li>Rank3持有[-, -, -, D*]（实际在位置3）</li>
+</ul>
+</li>
+<li><p><strong>Step 1</strong>:</p>
+<ul>
+<li>发送：R0→A*→R1, R1→B*→R2, R2→C*→R3, R3→D*→R0</li>
+<li>接收：每个节点接收一个新的规约块</li>
+<li>结果：R0持有[A*,-,-,D*], R1持有[A*,B*,-,-], R2持有[-,B*,C*,-], R3持有[-,-,C*,D*]</li>
+</ul>
+</li>
+<li><p><strong>Step 2</strong>:</p>
+<ul>
+<li>发送：R0→D*→R1, R1→A*→R2, R2→B*→R3, R3→C*→R0</li>
+<li>接收：每个节点再接收一个规约块</li>
+<li>结果：R0持有[A*,-,C*,D*], R1持有[A*,B*,D*,-], R2持有[A*,B*,C*,-], R3持有[-,B*,C*,D*]</li>
+</ul>
+</li>
+<li><p><strong>Step 3</strong>:</p>
+<ul>
+<li>发送：R0→C*→R1, R1→D*→R2, R2→A*→R3, R3→B*→R0</li>
+<li>接收：每个节点接收最后一个缺失的块</li>
+<li>结果：所有节点持有[A*, B*, C*, D*]</li>
+</ul>
+</li>
+<li><p><strong>通信特点</strong>:</p>
+<ul>
+<li>每步只使用环上的单向链路</li>
+<li>数据沿环顺时针流动</li>
+<li>每步传输的数据量为n&#x2F;p字节</li>
+<li>无需规约操作，纯数据传输</li>
+</ul>
+</li>
+</ul>
+<p><strong>其他原语执行方式：</strong></p>
+<ul>
+<li><strong>Broadcast</strong>: 数据不切分，沿环传输p-1步，每步传输完整数据</li>
+<li><strong>Reduce</strong>: 类似Broadcast，沿环传输并规约，最终根节点得到结果</li>
+<li><strong>AllGather</strong>: 仅执行阶段2，数据切分后沿环收集</li>
+<li><strong>ReduceScatter</strong>: 仅执行阶段1，数据切分后沿环规约</li>
+</ul>
+<h4 id="3-3-3-性能模型"><a href="#3-3-3-性能模型" class="headerlink" title="3.3.3 性能模型"></a>3.3.3 性能模型</h4><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>耗时公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scatter</td>
+<td>$(p-1)\alpha + \frac{p-1}{p}n\beta$</td>
+<td>沿环传输p-1步，每步传输1&#x2F;p数据</td>
+</tr>
+<tr>
+<td>Gather</td>
+<td>$(p-1)\alpha + \frac{p-1}{p}n\beta$</td>
+<td>沿环传输p-1步，每步传输1&#x2F;p数据</td>
+</tr>
+<tr>
+<td>Broadcast</td>
+<td>$(p-1)\alpha + (p-1)n\beta$</td>
+<td>沿环传输p-1步，每步传输完整数据</td>
+</tr>
+<tr>
+<td>Reduce</td>
+<td>$(p-1)\alpha + (p-1)n\beta + (p-1)n\gamma$</td>
+<td>沿环传输p-1步，每步传输完整数据并规约</td>
+</tr>
+<tr>
+<td>ReduceScatter</td>
+<td>$(p-1)\alpha + \frac{p-1}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>数据切分为p块，沿环传输p-1步并规约</td>
+</tr>
+<tr>
+<td>AllGather</td>
+<td>$(p-1)\alpha + \frac{p-1}{p}n\beta$</td>
+<td>数据切分为p块，沿环传输p-1步收集</td>
+</tr>
+<tr>
+<td>AllReduce</td>
+<td>$2(p-1)\alpha + 2\frac{p-1}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>ReduceScatter(p-1步) + AllGather(p-1步)</td>
+</tr>
+</tbody></table>
+<h3 id="3-4-RHD-Recursive-Halving-Doubling-算法"><a href="#3-4-RHD-Recursive-Halving-Doubling-算法" class="headerlink" title="3.4 RHD (Recursive Halving-Doubling) 算法"></a>3.4 RHD (Recursive Halving-Doubling) 算法</h3><h4 id="3-4-1-算法原理"><a href="#3-4-1-算法原理" class="headerlink" title="3.4.1 算法原理"></a>3.4.1 算法原理</h4><p>递归二分和倍增算法，通过对数级的通信步数实现高效通信。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;非2的幂次：p=5 (2²+1)&quot;</span><br><span class="line">        A1[5个Rank] --&gt; A2[Rank1数据合并到Rank0]</span><br><span class="line">        A2 --&gt; A3[变为4个有效Rank: 2²]</span><br><span class="line">        A3 --&gt; A4[执行标准RHD]</span><br><span class="line">        A4 --&gt; A5[Rank0数据复制到Rank1]</span><br><span class="line">        A5 --&gt; A6[完成]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;2的幂次：p=4&quot;</span><br><span class="line">        B1[4个Rank] --&gt; B2[两两交换并规约: log₂4=2步]</span><br><span class="line">        B2 --&gt; B3[ReduceScatter完成]</span><br><span class="line">        B3 --&gt; B4[两两拼接: 2步]</span><br><span class="line">        B4 --&gt; B5[AllGather完成]</span><br><span class="line">    end</span><br></pre></td></tr></table></figure>
+
+<p><strong>特点：</strong></p>
+<ul>
+<li><strong>时间复杂度：</strong> $O(\lceil \log_2 N \rceil)$ - 对数复杂度</li>
+<li><strong>适用场景：</strong><ul>
+<li>大规模集群（Server数量多）</li>
+<li>Server数量为2的幂次时性能最优</li>
+<li>中小数据量通信</li>
+</ul>
+</li>
+</ul>
+<h4 id="3-4-2-通信步骤示例（p-4，以AllReduce为例）"><a href="#3-4-2-通信步骤示例（p-4，以AllReduce为例）" class="headerlink" title="3.4.2 通信步骤示例（p&#x3D;4，以AllReduce为例）"></a>3.4.2 通信步骤示例（p&#x3D;4，以AllReduce为例）</h4><p><strong>说明：</strong> RHD算法支持多种集合通信原语（AllReduce、ReduceScatter、AllGather、Broadcast、Reduce等），此处以AllReduce为典型示例展示通信步骤。</p>
+<p><strong>ReduceScatter阶段（Recursive Halving）：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">sequenceDiagram</span><br><span class="line">    participant R0 as Rank0&lt;br/&gt;[A0,B0,C0,D0]</span><br><span class="line">    participant R1 as Rank1&lt;br/&gt;[A1,B1,C1,D1]</span><br><span class="line">    participant R2 as Rank2&lt;br/&gt;[A2,B2,C2,D2]</span><br><span class="line">    participant R3 as Rank3&lt;br/&gt;[A3,B3,C3,D3]</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Step 1: Distance=1, XOR操作(0⊕1=1, 2⊕3=1)</span><br><span class="line">    Note over R0,R3: 每对节点交换后半部分数据并规约</span><br><span class="line">    R0-&gt;&gt;R1: 发送[C0,D0], 接收[C1,D1]</span><br><span class="line">    R1-&gt;&gt;R0: 发送[C1,D1], 接收[C0,D0]</span><br><span class="line">    R2-&gt;&gt;R3: 发送[C2,D2], 接收[C3,D3]</span><br><span class="line">    R3-&gt;&gt;R2: 发送[C3,D3], 接收[C2,D2]</span><br><span class="line">    Note over R0: 持有[A0,B0,C0+C1,D0+D1]</span><br><span class="line">    Note over R1: 持有[A1,B1,C0+C1,D0+D1]</span><br><span class="line">    Note over R2: 持有[A2,B2,C2+C3,D2+D3]</span><br><span class="line">    Note over R3: 持有[A3,B3,C2+C3,D2+D3]</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Step 2: Distance=2, XOR操作(0⊕2=2, 1⊕3=2)</span><br><span class="line">    Note over R0,R3: 交换现有后半部分并规约</span><br><span class="line">    R0-&gt;&gt;R2: 发送[C0+C1,D0+D1], 接收[C2+C3,D2+D3]</span><br><span class="line">    R2-&gt;&gt;R0: 发送[C2+C3,D2+D3], 接收[C0+C1,D0+D1]</span><br><span class="line">    R1-&gt;&gt;R3: 发送[C0+C1,D0+D1], 接收[C2+C3,D2+D3]</span><br><span class="line">    R3-&gt;&gt;R1: 发送[C2+C3,D2+D3], 接收[C0+C1,D0+D1]</span><br><span class="line">    Note over R0: 持有[A0,B0,C*,D*] (C*=C0+C1+C2+C3)</span><br><span class="line">    Note over R1: 持有[A1,B1,C*,D*]</span><br><span class="line">    Note over R2: 持有[A2,B2,C*,D*]</span><br><span class="line">    Note over R3: 持有[A3,B3,C*,D*]</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: 继续处理前半部分（此处省略）</span><br><span class="line">    Note over R0,R3: 最终每个Rank持有不同的完整规约块</span><br></pre></td></tr></table></figure>
+
+<p><strong>AllGather阶段（Recursive Doubling）：</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">sequenceDiagram</span><br><span class="line">    participant R0 as Rank0</span><br><span class="line">    participant R1 as Rank1</span><br><span class="line">    participant R2 as Rank2</span><br><span class="line">    participant R3 as Rank3</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: 假设ReduceScatter后:</span><br><span class="line">    Note over R0: [A*,-,-,-]</span><br><span class="line">    Note over R1: [-,B*,-,-]</span><br><span class="line">    Note over R2: [-,-,C*,-]</span><br><span class="line">    Note over R3: [-,-,-,D*]</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Step 1: Distance=2, 交换数据</span><br><span class="line">    R0-&gt;&gt;R2: 发送A*, 接收C*</span><br><span class="line">    R2-&gt;&gt;R0: 发送C*, 接收A*</span><br><span class="line">    R1-&gt;&gt;R3: 发送B*, 接收D*</span><br><span class="line">    R3-&gt;&gt;R1: 发送D*, 接收B*</span><br><span class="line">    Note over R0: [A*,-,C*,-]</span><br><span class="line">    Note over R1: [-,B*,-,D*]</span><br><span class="line">    Note over R2: [A*,-,C*,-]</span><br><span class="line">    Note over R3: [-,B*,-,D*]</span><br><span class="line">    </span><br><span class="line">    Note over R0,R3: Step 2: Distance=1, 交换数据</span><br><span class="line">    R0-&gt;&gt;R1: 发送[A*,C*], 接收[B*,D*]</span><br><span class="line">    R1-&gt;&gt;R0: 发送[B*,D*], 接收[A*,C*]</span><br><span class="line">    R2-&gt;&gt;R3: 发送[A*,C*], 接收[B*,D*]</span><br><span class="line">    R3-&gt;&gt;R2: 发送[B*,D*], 接收[A*,C*]</span><br><span class="line">    Note over R0,R3: 所有节点持有[A*,B*,C*,D*]</span><br></pre></td></tr></table></figure>
+
+<p><strong>详细执行流程说明：</strong></p>
+<p><strong>ReduceScatter阶段详解（Recursive Halving）：</strong></p>
+<p>该阶段核心思想是通过递归对半分组（Distance Halving）将数据分散规约到各个节点。距离distance采用指数递减模式：p&#x2F;2 → p&#x2F;4 → … → 1。</p>
+<p><strong>初始状态：</strong> 每个节点持有完整数据[A,B,C,D]，需要对4个块分别规约，最终每个节点持有其中一个完整规约块。</p>
+<p><strong>Step 1 (Distance&#x3D;2)：</strong> 节点分为两组：{R0,R1} ↔ {R2,R3}。通过XOR找到通信对（Rank XOR 2），每个节点负责处理一半数据。</p>
+<ul>
+<li><strong>R0 ↔ R2通信</strong>：R0发送后半部分[C,D]并接收同样位置的[C,D]，对接收数据执行规约操作（C←C+C, D←D+D），同时接收R2的前半部分[A,B]并规约到本地前半部分</li>
+<li><strong>R1 ↔ R3通信</strong>：同样的交换和规约操作</li>
+<li><strong>处理后状态</strong>：<ul>
+<li>R0持有[A0+A2, B0+B2, C0+C2, D0+D2]，但仅负责前半部分（后半部分将被丢弃）</li>
+<li>R1持有[A1+A3, B1+B3, C1+C3, D1+D3]，仅负责前半部分</li>
+<li>R2持有[A0+A2, B0+B2, C0+C2, D0+D2]，仅负责后半部分</li>
+<li>R3持有[A1+A3, B1+B3, C1+C3, D1+D3]，仅负责后半部分</li>
+</ul>
+</li>
+<li><strong>数据缩减</strong>：每个节点从4个块缩减为2个有效块</li>
+</ul>
+<p><strong>Step 2 (Distance&#x3D;1)：</strong> 在上一步的基础上继续对半分组。R0↔R1处理前半部分{A,B}，R2↔R3处理后半部分{C,D}。</p>
+<ul>
+<li><strong>R0 ↔ R1通信</strong>：交换和规约B块（R0最终持有完整规约的A块，R1持有B块）</li>
+<li><strong>R2 ↔ R3通信</strong>：交换和规约D块（R2最终持有完整规约的C块，R3持有D块）</li>
+<li><strong>处理后状态</strong>：<ul>
+<li>R0: [A0+A1+A2+A3, -, -, -]（简写为[A*, -, -, -]）</li>
+<li>R1: [-, B0+B1+B2+B3, -, -]（简写为[-, B*, -, -]）</li>
+<li>R2: [-, -, C0+C1+C2+C3, -]（简写为[-, -, C*, -]）</li>
+<li>R3: [-, -, -, D0+D1+D2+D3]（简写为[-, -, -, D*]）</li>
+</ul>
+</li>
+<li><strong>数据缩减</strong>：每个节点从2个块缩减为1个完整规约块</li>
+</ul>
+<p><strong>ReduceScatter特点</strong>：log₂p步递归对半，每步数据量减半，所有节点同时工作，通信和计算高度重叠。</p>
+<p><strong>AllGather阶段详解（Recursive Doubling）：</strong></p>
+<p>该阶段核心思想是通过递归加倍距离（Distance Doubling）收集所有规约结果。距离distance采用指数递增模式：1 → 2 → 4 → …。</p>
+<p><strong>初始状态：</strong> ReduceScatter完成后，每个节点持有一个完整规约块：R0持有[A*,-,-,-]，R1持有[-,B*,-,-]，R2持有[-,-,C*,-]，R3持有[-,-,-,D*]。</p>
+<p><strong>Step 1 (Distance&#x3D;2)：</strong> 首先在距离为2的节点间交换数据。通过XOR找到通信对（Rank XOR 2）。</p>
+<ul>
+<li><strong>R0 ↔ R2通信</strong>：R0发送A<em>并接收C</em>，R2发送C<em>并接收A</em></li>
+<li><strong>R1 ↔ R3通信</strong>：R1发送B<em>并接收D</em>，R3发送D<em>并接收B</em></li>
+<li><strong>通信后状态</strong>：<ul>
+<li>R0: [A*, -, C*, -]（持有第0和第2块的完整规约结果）</li>
+<li>R1: [-, B*, -, D*]（持有第1和第3块）</li>
+<li>R2: [A*, -, C*, -]（持有第0和第2块）</li>
+<li>R3: [-, B*, -, D*]（持有第1和第3块）</li>
+</ul>
+</li>
+<li><strong>数据增长</strong>：每个节点从1个块增长为2个块</li>
+</ul>
+<p><strong>Step 2 (Distance&#x3D;1)：</strong> 在距离为1的相邻节点间交换数据，完成最终收集。</p>
+<ul>
+<li><strong>R0 ↔ R1通信</strong>：R0发送[A*,C*]并接收[B*,D*]，R1发送[B*,D*]并接收[A*,C*]</li>
+<li><strong>R2 ↔ R3通信</strong>：R2发送[A*,C*]并接收[B*,D*]，R3发送[B*,D*]并接收[A*,C*]</li>
+<li><strong>最终状态</strong>：所有节点持有[A*, B*, C*, D*]，即所有数据的完整规约结果</li>
+</ul>
+<p><strong>AllGather特点</strong>：log₂p步递归加倍，每步传输数据量倍增（1块→2块→4块），无需计算操作，纯粹的数据收集。</p>
+<p><strong>RHD算法整体特点</strong>：</p>
+<ol>
+<li><strong>对数级复杂度</strong>：总共2log₂p步通信（ReduceScatter log₂p步 + AllGather log₂p步）</li>
+<li><strong>XOR通信模式</strong>：每步通过Rank XOR Distance确定通信对，保证无冲突并行</li>
+<li><strong>数据量变化</strong>：ReduceScatter递减（n → n&#x2F;2 → n&#x2F;4 → …），AllGather递增（n&#x2F;p → 2n&#x2F;p → 4n&#x2F;p → …）</li>
+<li><strong>最优性</strong>：对于2的幂次节点数，是理论最优算法（最少通信步数）</li>
+<li><strong>限制条件</strong>：仅适用于节点数为2的幂次（非2幂次需要额外步骤处理）</li>
+</ol>
+<p><strong>其他原语执行方式：</strong></p>
+<ul>
+<li><strong>Broadcast</strong>: 采用Distance Halving策略，从根节点开始递归扩散</li>
+<li><strong>ReduceScatter</strong>: 仅执行ReduceScatter阶段（Recursive Halving）</li>
+<li><strong>AllGather</strong>: 仅执行AllGather阶段（Recursive Doubling）</li>
+</ul>
+<h4 id="3-4-3-性能模型"><a href="#3-4-3-性能模型" class="headerlink" title="3.4.3 性能模型"></a>3.4.3 性能模型</h4><p><strong>2的幂次（p &#x3D; 2^k）：</strong></p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>耗时公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Broadcast</td>
+<td>$\lceil \log_2 p \rceil\alpha + \lceil \log_2 p \rceil n\beta$</td>
+<td>Distance Halving策略，log₂p步，每步传输完整n字节数据</td>
+</tr>
+<tr>
+<td>ReduceScatter</td>
+<td>$\log_2 p \cdot \alpha + \frac{p-1}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>Vector Doubling + Distance Halving，log₂p步递归对半交换</td>
+</tr>
+<tr>
+<td>AllGather</td>
+<td>$\log_2 p \cdot \alpha + \frac{p-1}{p}n\beta$</td>
+<td>Distance Doubling策略，log₂p步，每步数据量倍增</td>
+</tr>
+<tr>
+<td>AllReduce</td>
+<td>$2\log_2 p \cdot \alpha + 2\frac{p-1}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>ReduceScatter(log₂p步) + AllGather(log₂p步)，规约一次</td>
+</tr>
+</tbody></table>
+<p><strong>非2的幂次（需要额外步骤）：</strong></p>
+<p>$$<br>\text{AllReduce} &#x3D; (2\lfloor \log_2 p \rfloor + 2)\alpha + (2\frac{p’-1}{p’} + 2)n\beta + (\frac{p’-1}{p’} + 1)n\gamma<br>$$</p>
+<p>其中 $p’ &#x3D; 2^{\lfloor \log_2 p \rfloor}$</p>
+<h3 id="3-5-PairWise-算法"><a href="#3-5-PairWise-算法" class="headerlink" title="3.5 PairWise 算法"></a>3.5 PairWise 算法</h3><h4 id="3-5-1-算法原理"><a href="#3-5-1-算法原理" class="headerlink" title="3.5.1 算法原理"></a>3.5.1 算法原理</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;Step 1&quot;</span><br><span class="line">        R0_1[Rank0] --&gt;|发送| R1_1[Rank1]</span><br><span class="line">        R1_1 --&gt;|发送| R0_1</span><br><span class="line">        R2_1[Rank2] --&gt;|发送| R3_1[Rank3]</span><br><span class="line">        R3_1 --&gt;|发送| R2_1</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Step 2&quot;</span><br><span class="line">        R0_2[Rank0] --&gt;|发送| R2_2[Rank2]</span><br><span class="line">        R2_2 --&gt;|发送| R0_2</span><br><span class="line">        R1_2[Rank1] --&gt;|发送| R3_2[Rank3]</span><br><span class="line">        R3_2 --&gt;|发送| R1_2</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Step 3&quot;</span><br><span class="line">        R0_3[Rank0] --&gt;|发送| R3_3[Rank3]</span><br><span class="line">        R3_3 --&gt;|发送| R0_3</span><br><span class="line">        R1_3[Rank1] --&gt;|发送| R2_3[Rank2]</span><br><span class="line">        R2_3 --&gt;|发送| R1_3</span><br><span class="line">    end</span><br></pre></td></tr></table></figure>
+
+<p><strong>算法原理说明：</strong></p>
+<p>PairWise算法是专为<strong>AllToAll&#x2F;AllToAllV算子</strong>设计的高效通信策略，核心目标是<strong>避免网络端口拥塞</strong>。在AllToAll操作中，每个节点需要向其他所有节点发送数据，传统方法可能导致某个节点同时向多个目标发送（”一打多”现象），造成端口带宽竞争和拥塞。</p>
+<p><strong>核心机制：配对交换（Pairwise Exchange）</strong></p>
+<p>PairWise通过将p个节点的通信组织为 <strong>(p-1)轮配对交换</strong>，每轮确保：</p>
+<ol>
+<li><strong>无冲突并行</strong>：每个节点在每轮只与一个对端通信</li>
+<li><strong>端口独占</strong>：避免多流竞争单个网络端口</li>
+<li><strong>循环配对</strong>：通过固定的配对模式覆盖所有节点对</li>
+</ol>
+<p><strong>配对模式（以4节点为例）：</strong></p>
+<ul>
+<li><p><strong>Step 1</strong>：{R0 ↔ R1}, {R2 ↔ R3}</p>
+<ul>
+<li>Rank0与Rank1双向交换数据</li>
+<li>Rank2与Rank3双向交换数据</li>
+<li>两对通信完全并行，无干扰</li>
+</ul>
+</li>
+<li><p><strong>Step 2</strong>：{R0 ↔ R2}, {R1 ↔ R3}</p>
+<ul>
+<li>配对方式改变，Rank0与Rank2交换</li>
+<li>Rank1与Rank3交换</li>
+<li>依然保持两两配对，无冲突</li>
+</ul>
+</li>
+<li><p><strong>Step 3</strong>：{R0 ↔ R3}, {R1 ↔ R2}</p>
+<ul>
+<li>最后一轮配对，Rank0与Rank3交换</li>
+<li>Rank1与Rank2交换</li>
+<li>完成所有节点对的通信</li>
+</ul>
+</li>
+</ul>
+<p><strong>数学规律：</strong></p>
+<ul>
+<li>对于p个节点，需要 <strong>(p-1)轮</strong> 完成所有节点对的交换</li>
+<li>第k轮（k&#x3D;1,2,…,p-1），节点i与节点(i+k) mod p通信</li>
+<li>每轮p&#x2F;2对节点同时通信（p为偶数）</li>
+</ul>
+<p><strong>优势分析：</strong></p>
+<ol>
+<li><strong>避免端口拥塞</strong>：传统AllToAll可能某节点同时向多个目标发送，导致单端口多流竞争；PairWise确保每节点每轮只有一条连接</li>
+<li><strong>RDMA友好</strong>：RDMA环境下，点对点独占通信可获得最佳性能</li>
+<li><strong>大数据量优化</strong>：数据量大时，端口拥塞影响显著，PairWise优势明显</li>
+<li><strong>可预测性能</strong>：通信模式固定，延迟和带宽使用可精确预测</li>
+</ol>
+<p><strong>局限性：</strong></p>
+<ul>
+<li><strong>步数多</strong>：需要p-1步，相比RHD的log₂p步要多（但每步更高效）</li>
+<li><strong>小数据不适用</strong>：小数据量时，启动开销(α)占主导，多步数劣势明显</li>
+<li><strong>专用算子</strong>：主要用于AllToAll，不适用于AllReduce等需要规约的场景</li>
+</ul>
+<p><strong>特点：</strong></p>
+<ul>
+<li><strong>专用场景：</strong> AllToAll、AllToAllV算子</li>
+<li><strong>时间复杂度：</strong> O(p-1) - 线性复杂度</li>
+<li><strong>关键优势：</strong> 避免”一打多”现象（单端口多流竞争）</li>
+<li><strong>适用场景：</strong><ul>
+<li>大数据量通信</li>
+<li>RDMA网络环境</li>
+<li>需避免端口拥塞的场景</li>
+</ul>
+</li>
+</ul>
+<h4 id="3-5-2-性能模型"><a href="#3-5-2-性能模型" class="headerlink" title="3.5.2 性能模型"></a>3.5.2 性能模型</h4><p>定义 $n_{ij}$ 为节点i发送给节点j的数据量：</p>
+<p>$$<br>T &#x3D; (p-1)\alpha + \beta \sum_{k&#x3D;1}^{p-1} \max_{i}(n_{i,i+k})<br>$$</p>
+<h3 id="3-6-Star-算法"><a href="#3-6-Star-算法" class="headerlink" title="3.6 Star 算法"></a>3.6 Star 算法</h3><h4 id="3-6-1-算法原理"><a href="#3-6-1-算法原理" class="headerlink" title="3.6.1 算法原理"></a>3.6.1 算法原理</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">graph TD</span><br><span class="line">    Root((Root&lt;br/&gt;根节点))</span><br><span class="line">    </span><br><span class="line">    Root ---|一步完成| R1((Rank1))</span><br><span class="line">    Root ---|一步完成| R2((Rank2))</span><br><span class="line">    Root ---|一步完成| R3((Rank3))</span><br><span class="line">    Root ---|一步完成| R4((Rank4))</span><br><span class="line">    </span><br><span class="line">    style Root fill:#ff6b6b</span><br><span class="line">    style R1 fill:#4ecdc4</span><br><span class="line">    style R2 fill:#4ecdc4</span><br><span class="line">    style R3 fill:#4ecdc4</span><br><span class="line">    style R4 fill:#4ecdc4</span><br></pre></td></tr></table></figure>
+
+<p><strong>算法原理说明：</strong></p>
+<p>Star算法是最简单直接的集合通信算法，采用<strong>星型拓扑</strong>结构，所有通信都通过<strong>中心根节点（Root）<strong>进行。适用于</strong>Server内高带宽全连接</strong>或<strong>有明确根节点</strong>的通信场景。</p>
+<p><strong>核心特点：单步完成（O(1)复杂度）</strong></p>
+<p>Star算法的核心优势是<strong>一步到位</strong>：根节点直接与所有其他节点通信，无需多跳转发。这在高带宽、低延迟的网络环境下性能最优。</p>
+<p><strong>典型应用场景：</strong></p>
+<ol>
+<li><p><strong>Broadcast（广播）</strong>：</p>
+<ul>
+<li>Root节点持有数据，需要发送给所有其他节点</li>
+<li>执行：Root → {R1, R2, R3, R4}同时发送</li>
+<li>一步完成，耗时 &#x3D; α + nβ（一次延迟 + 传输时间）</li>
+</ul>
+</li>
+<li><p><strong>Reduce（规约到根节点）</strong>：</p>
+<ul>
+<li>所有节点的数据需要规约到Root</li>
+<li>执行：{R1, R2, R3, R4} → Root同时发送并在Root规约</li>
+<li>一步完成，耗时 &#x3D; α + nβ + nγ（延迟 + 传输 + 规约）</li>
+</ul>
+</li>
+<li><p><strong>Gather（收集到根节点）</strong>：</p>
+<ul>
+<li>所有节点的数据收集到Root（无需规约）</li>
+<li>执行：{R1, R2, R3, R4} → Root同时发送</li>
+<li>一步完成，耗时 &#x3D; α + nβ</li>
+</ul>
+</li>
+<li><p><strong>Scatter（分发）</strong>：</p>
+<ul>
+<li>Root将不同数据块分发给不同节点</li>
+<li>执行：Root → {R1, R2, R3, R4}同时发送不同块</li>
+<li>一步完成，耗时 &#x3D; α + (n&#x2F;p)β（每个节点接收n&#x2F;p大小数据）</li>
+</ul>
+</li>
+</ol>
+<p><strong>网络拓扑要求：</strong></p>
+<ul>
+<li><strong>物理全连接</strong>：Root与所有节点直接相连（如Server内NVLink&#x2F;PCIe全连接）</li>
+<li><strong>高带宽链路</strong>：链路带宽足够高，可支持Root同时多流发送而不拥塞</li>
+<li><strong>低延迟</strong>：单跳延迟小，一步通信开销可接受</li>
+</ul>
+<p><strong>优势：</strong></p>
+<ol>
+<li><strong>最优时间复杂度</strong>：O(1)，理论上最快</li>
+<li><strong>逻辑简单</strong>：无需复杂调度和同步</li>
+<li><strong>Server内最优</strong>：Server内NPU通过NVLink全连接，Star是首选</li>
+</ol>
+<p><strong>局限性：</strong></p>
+<ol>
+<li><strong>根节点瓶颈</strong>：Root需要同时与p-1个节点通信，带宽压力大<ul>
+<li>发送带宽：Root需发送(p-1)×n数据（Broadcast场景）</li>
+<li>接收带宽：Root需接收(p-1)×n数据（Reduce场景）</li>
+</ul>
+</li>
+<li><strong>不适合Server间</strong>：跨Server通信带宽有限，Root瓶颈严重</li>
+<li><strong>无负载均衡</strong>：所有流量集中在Root，其他节点链路利用率低</li>
+<li><strong>不支持AllToAll</strong>：AllToAll需要所有节点对通信，Star无法高效实现</li>
+</ol>
+<p><strong>适用原语限制：</strong></p>
+<p>✅ <strong>适用</strong>：Broadcast、Reduce、Gather、Scatter（有明确根节点的单向通信）<br>❌ <strong>不适用</strong>：AllReduce、AllGather、ReduceScatter、AllToAll（需要所有节点间通信）</p>
+<p><strong>特点：</strong></p>
+<ul>
+<li><strong>拓扑：</strong> 星型或全连接</li>
+<li><strong>时间复杂度：</strong> O(1) - 单步完成</li>
+<li><strong>适用算子：</strong> Broadcast、Reduce、Gather、Scatter</li>
+<li><strong>适用场景：</strong> Server内通信，有根节点的操作</li>
+</ul>
+<h4 id="3-6-2-性能模型"><a href="#3-6-2-性能模型" class="headerlink" title="3.6.2 性能模型"></a>3.6.2 性能模型</h4><p>$$<br>T &#x3D; \alpha + n\beta<br>$$</p>
+<p>非常简洁，仅一步通信完成。</p>
+<h3 id="3-7-NHR-Nonuniform-Hierarchical-Ring-算法"><a href="#3-7-NHR-Nonuniform-Hierarchical-Ring-算法" class="headerlink" title="3.7 NHR (Nonuniform Hierarchical Ring) 算法"></a>3.7 NHR (Nonuniform Hierarchical Ring) 算法</h3><h4 id="3-7-1-算法原理"><a href="#3-7-1-算法原理" class="headerlink" title="3.7.1 算法原理"></a>3.7.1 算法原理</h4><p>非均衡的层次环算法，通过构建N棵生成树实现高效通信。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;Rank Size = 4 (2的幂次)&quot;</span><br><span class="line">        A1[初始状态] --&gt; A2[Step 1: 交换1/2数据]</span><br><span class="line">        A2 --&gt; A3[Step 2: 交换1/4数据]</span><br><span class="line">        A3 --&gt; A4[完成]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Rank Size = 5 (非2的幂次)&quot;</span><br><span class="line">        B1[初始状态] --&gt; B2[Step 1: 不均匀切片]</span><br><span class="line">        B2 --&gt; B3[Step 2: 大部分连续收发]</span><br><span class="line">        B3 --&gt; B4[Step 3: 少量离散处理]</span><br><span class="line">        B4 --&gt; B5[完成]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Note1[树深度: ⌈log₂N⌉]</span><br><span class="line">    Note2[优化: 聚合发送&lt;br/&gt;减少网络包数]</span><br></pre></td></tr></table></figure>
+
+<p><strong>算法原理说明：</strong></p>
+<p>NHR（Nonuniform Hierarchical Ring）算法是<strong>非均衡的层次化环算法</strong>，专门解决<strong>节点数不是2的幂次</strong>时的高效通信问题。传统RHD算法要求节点数为2的幂次，否则性能大幅下降；NHR通过<strong>N棵生成树</strong>和<strong>不均匀切片</strong>策略，在任意节点数下都能保持对数级复杂度。</p>
+<p><strong>核心创新：N棵生成树（N Spanning Trees）</strong></p>
+<p>NHR的关键思想是构建<strong>N &#x3D; ⌈log₂p⌉棵生成树</strong>，每棵树负责一部分数据的通信：</p>
+<ul>
+<li><strong>树的深度</strong>：⌈log₂p⌉（与节点数对数相关）</li>
+<li><strong>树的结构</strong>：每棵树根据节点编号和步数动态确定父子关系</li>
+<li><strong>数据分配</strong>：将总数据均匀或非均匀切分到N棵树</li>
+</ul>
+<p><strong>2的幂次 vs 非2的幂次对比：</strong></p>
+<p><strong>场景1：Rank Size &#x3D; 4（2的幂次）</strong></p>
+<ul>
+<li><strong>Step 1</strong>：交换1&#x2F;2数据（距离&#x3D;2）<ul>
+<li>R0 ↔ R2，R1 ↔ R3</li>
+<li>每个节点交换一半数据</li>
+</ul>
+</li>
+<li><strong>Step 2</strong>：交换1&#x2F;4数据（距离&#x3D;1）<ul>
+<li>R0 ↔ R1，R2 ↔ R3</li>
+<li>每个节点再交换剩余的一半</li>
+</ul>
+</li>
+<li><strong>完成</strong>：2步（log₂4&#x3D;2），每步数据量递减</li>
+</ul>
+<p><strong>场景2：Rank Size &#x3D; 5（非2的幂次）</strong></p>
+<ul>
+<li><strong>问题</strong>：不能均匀对半分，需要不均匀切片</li>
+<li><strong>Step 1</strong>：不均匀切片（某些节点交换2&#x2F;5，某些交换3&#x2F;5）<ul>
+<li>根据树结构动态确定交换量</li>
+</ul>
+</li>
+<li><strong>Step 2</strong>：大部分连续收发（利用连续内存，减少小包）<ul>
+<li>聚合发送优化，减少网络包数</li>
+</ul>
+</li>
+<li><strong>Step 3</strong>：少量离散处理（处理不对齐部分）<ul>
+<li>完成剩余数据交换</li>
+</ul>
+</li>
+<li><strong>完成</strong>：3步（⌈log₂5⌉&#x3D;3），虽然不均匀但保持对数复杂度</li>
+</ul>
+<p><strong>关键技术：聚合发送优化（Aggregated Send）</strong></p>
+<p>NHR的另一个优化是针对<strong>小数据包场景</strong>：</p>
+<ul>
+<li><strong>问题</strong>：多棵树可能产生大量小数据包，网络包头开销大</li>
+<li><strong>解决</strong>：在小数据场景下，采用<strong>单棵树策略</strong>，将所有数据通过一棵树传输</li>
+<li><strong>效果</strong>：减少网络包数量，降低协议栈开销</li>
+</ul>
+<p><strong>流量分布优化：</strong></p>
+<p>NHR算法设计时考虑了<strong>物理位置相近性</strong>：</p>
+<ul>
+<li><strong>最大流量</strong>：尽量安排在物理位置相近的节点间（如同Server内）</li>
+<li><strong>减少冲突</strong>：通过树结构避免多流竞争同一链路</li>
+<li><strong>层次化友好</strong>：适配Server内+Server间的层次化网络</li>
+</ul>
+<p><strong>适用场景：</strong></p>
+<ol>
+<li><strong>大规模集群</strong>：Server数量多，节点数往往不是2的幂次</li>
+<li><strong>非对称拓扑</strong>：节点数任意（5、6、7等），不受2的幂次限制</li>
+<li><strong>小数据包通信</strong>：聚合发送优化提升小包性能</li>
+<li><strong>层次化网络</strong>：流量分布优化适配收敛比网络</li>
+</ol>
+<p><strong>与RHD对比：</strong></p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>RHD</th>
+<th>NHR</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>节点数要求</td>
+<td>必须是2的幂次</td>
+<td>任意节点数</td>
+</tr>
+<tr>
+<td>时间复杂度</td>
+<td>O(log₂p)</td>
+<td>O(⌈log₂p⌉)</td>
+</tr>
+<tr>
+<td>数据切分</td>
+<td>均匀</td>
+<td>可能不均匀</td>
+</tr>
+<tr>
+<td>小数据优化</td>
+<td>无</td>
+<td>单棵树策略</td>
+</tr>
+<tr>
+<td>实现复杂度</td>
+<td>低</td>
+<td>中等</td>
+</tr>
+</tbody></table>
+<p><strong>算法优势：</strong></p>
+<ol>
+<li><strong>通用性强</strong>：任意节点数都能高效运行</li>
+<li><strong>对数复杂度</strong>：保持⌈log₂p⌉步通信，接近理论最优</li>
+<li><strong>灵活优化</strong>：可根据数据量、网络拓扑调整策略</li>
+<li><strong>工程实用</strong>：大规模集群中节点数变化常见，NHR适应性好</li>
+</ol>
+<p><strong>特点：</strong></p>
+<ul>
+<li><strong>时间复杂度：</strong> $O(\lceil \log_2 N \rceil)$</li>
+<li><strong>关键优势：</strong><ul>
+<li>无论节点数是否为2的幂次，均保持对数复杂度</li>
+<li>最大流量集中在物理位置相近节点间</li>
+<li>减少流量冲突</li>
+<li>小数据包场景优化（单棵树策略）</li>
+</ul>
+</li>
+<li><strong>适用场景：</strong> 大规模集群，Server数量多</li>
+</ul>
+<h4 id="3-7-2-性能模型"><a href="#3-7-2-性能模型" class="headerlink" title="3.7.2 性能模型"></a>3.7.2 性能模型</h4><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>耗时公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ReduceScatter</td>
+<td>$\lceil \log_2 p \rceil\alpha + \frac{p-1}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>N棵生成树，树深度⌈log₂p⌉，聚合发送减少包数</td>
+</tr>
+<tr>
+<td>AllGather</td>
+<td>$\lceil \log_2 p \rceil\alpha + \frac{p-1}{p}n\beta$</td>
+<td>与ReduceScatter对称，⌈log₂p⌉步收集，无规约开销</td>
+</tr>
+<tr>
+<td>AllReduce</td>
+<td>$2\lceil \log_2 p \rceil\alpha + 2\frac{p-1}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>ReduceScatter(⌈log₂p⌉步) + AllGather(⌈log₂p⌉步)</td>
+</tr>
+<tr>
+<td>Scatter</td>
+<td>$\lceil \log_2 p \rceil\alpha + \frac{p-1}{p}n\beta$</td>
+<td>小数据包场景优化，采用单棵树策略，⌈log₂p⌉步完成</td>
+</tr>
+<tr>
+<td>Broadcast</td>
+<td>$2\lceil \log_2 p \rceil\alpha + 2\frac{p-1}{p}n\beta$</td>
+<td>Scatter(⌈log₂p⌉步) + AllGather(⌈log₂p⌉步)实现</td>
+</tr>
+</tbody></table>
+<h3 id="3-8-NB-Nonuniform-Bruck-算法"><a href="#3-8-NB-Nonuniform-Bruck-算法" class="headerlink" title="3.8 NB (Nonuniform Bruck) 算法"></a>3.8 NB (Nonuniform Bruck) 算法</h3><h4 id="3-8-1-算法原理"><a href="#3-8-1-算法原理" class="headerlink" title="3.8.1 算法原理"></a>3.8.1 算法原理</h4><p>非均匀的数据块通信算法，通过动态调整步长的多重环状结构实现高效通信。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;Rank Size = 4&quot;</span><br><span class="line">        A1[初始状态] --&gt; A2[Step 1: 步长=1]</span><br><span class="line">        A2 --&gt; A3[Step 2: 步长=2]</span><br><span class="line">        A3 --&gt; A4[完成 log₂4=2步]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Rank Size = 5&quot;</span><br><span class="line">        B1[初始状态] --&gt; B2[Step 1: 步长=1]</span><br><span class="line">        B2 --&gt; B3[Step 2: 步长=2]</span><br><span class="line">        B3 --&gt; B4[Step 3: 步长=4]</span><br><span class="line">        B4 --&gt; B5[完成 ⌈log₂5⌉=3步]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Note1[关键: 每步发送&lt;br/&gt;⌊N-1+2^k/2^k+1⌋ 份数据]</span><br></pre></td></tr></table></figure>
+
+<p><strong>算法原理说明：</strong></p>
+<p>NB（Nonuniform Bruck）算法是<strong>非均匀Bruck算法</strong>，是对经典Bruck算法的改进，专门解决<strong>任意节点数</strong>下的高效集合通信。与NHR类似，NB也是为了克服RHD算法对2的幂次节点数的限制，但采用了不同的技术路线：<strong>动态步长多重环</strong>。</p>
+<p><strong>核心机制：动态步长递增（Dynamic Distance Increment）</strong></p>
+<p>NB算法的核心特点是<strong>步长按指数递增</strong>：1 → 2 → 4 → 8 → …</p>
+<ul>
+<li><strong>第k步</strong>：每个节点与距离为2^(k-1)的节点通信</li>
+<li><strong>通信模式</strong>：节点i与节点(i+2^(k-1)) mod p通信</li>
+<li><strong>数据量</strong>：第k步发送 ⌊(p-1+2^k)&#x2F;2^(k+1)⌋ 份数据（非均匀）</li>
+</ul>
+<p><strong>2的幂次 vs 非2的幂次对比：</strong></p>
+<p><strong>场景1：Rank Size &#x3D; 4（2的幂次）</strong></p>
+<ul>
+<li><strong>初始状态</strong>：每个节点持有1份数据，需收集其他3份</li>
+<li><strong>Step 1（步长&#x3D;1）</strong>：<ul>
+<li>R0 ↔ R1，R2 ↔ R3</li>
+<li>每个节点交换1份数据，现在各持有2份</li>
+</ul>
+</li>
+<li><strong>Step 2（步长&#x3D;2）</strong>：<ul>
+<li>R0 ↔ R2，R1 ↔ R3</li>
+<li>每个节点交换2份数据，现在各持有4份（全部数据）</li>
+</ul>
+</li>
+<li><strong>完成</strong>：2步（log₂4&#x3D;2），每步数据量加倍</li>
+</ul>
+<p><strong>场景2：Rank Size &#x3D; 5（非2的幂次）</strong></p>
+<ul>
+<li><strong>初始状态</strong>：每个节点持有1份数据，需收集其他4份</li>
+<li><strong>Step 1（步长&#x3D;1）</strong>：<ul>
+<li>R0 ↔ R1，R1 ↔ R2，R2 ↔ R3，R3 ↔ R4，R4 ↔ R0（环状）</li>
+<li>每个节点交换1份，现在各持有2份</li>
+<li><strong>数据量</strong>：⌊(5-1+2)&#x2F;4⌋ &#x3D; 1份</li>
+</ul>
+</li>
+<li><strong>Step 2（步长&#x3D;2）</strong>：<ul>
+<li>R0 ↔ R2，R1 ↔ R3，R2 ↔ R4，R3 ↔ R0，R4 ↔ R1</li>
+<li>每个节点交换2份，现在各持有3或4份</li>
+<li><strong>数据量</strong>：⌊(5-1+4)&#x2F;8⌋ &#x3D; 1份（但实际交换的是2份，因为有部分重复）</li>
+</ul>
+</li>
+<li><strong>Step 3（步长&#x3D;4）</strong>：<ul>
+<li>R0 ↔ R4，R1 ↔ R0，R2 ↔ R1，R3 ↔ R2，R4 ↔ R3</li>
+<li>补齐剩余数据，所有节点持有全部5份</li>
+<li><strong>数据量</strong>：⌊(5-1+8)&#x2F;16⌋ &#x3D; 0或1份（少量补充）</li>
+</ul>
+</li>
+<li><strong>完成</strong>：3步（⌈log₂5⌉&#x3D;3），通过非均匀数据量分配完成</li>
+</ul>
+<p><strong>关键公式：每步发送数据量</strong></p>
+<p>第k步发送数据量 &#x3D; ⌊(N-1+2^k)&#x2F;2^(k+1)⌋ 份</p>
+<p><strong>公式解释：</strong></p>
+<ul>
+<li><strong>N-1</strong>：总共需要收集的其他节点数据份数</li>
+<li><strong>2^k</strong>：当前步的”覆盖范围”补偿</li>
+<li><strong>2^(k+1)</strong>：归一化因子</li>
+<li><strong>向下取整</strong>：确保数据量为整数</li>
+</ul>
+<p><strong>示例（N&#x3D;5）：</strong></p>
+<ul>
+<li>k&#x3D;1: ⌊(5-1+2)&#x2F;4⌋ &#x3D; ⌊7&#x2F;4⌋ &#x3D; 1</li>
+<li>k&#x3D;2: ⌊(5-1+4)&#x2F;8⌋ &#x3D; ⌊8&#x2F;8⌋ &#x3D; 1</li>
+<li>k&#x3D;3: ⌊(5-1+8)&#x2F;16⌋ &#x3D; ⌊12&#x2F;16⌋ &#x3D; 0（剩余数据很少）</li>
+</ul>
+<p><strong>与RHD和NHR对比：</strong></p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>RHD</th>
+<th>NHR</th>
+<th>NB</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>节点数要求</td>
+<td>2的幂次</td>
+<td>任意</td>
+<td>任意</td>
+</tr>
+<tr>
+<td>时间复杂度</td>
+<td>O(log₂p)</td>
+<td>O(⌈log₂p⌉)</td>
+<td>O(⌈log₂p⌉)</td>
+</tr>
+<tr>
+<td>通信模式</td>
+<td>XOR</td>
+<td>N棵生成树</td>
+<td>动态步长环</td>
+</tr>
+<tr>
+<td>额外通信量</td>
+<td>无</td>
+<td>少量</td>
+<td>几乎无</td>
+</tr>
+<tr>
+<td>实现复杂度</td>
+<td>低</td>
+<td>中</td>
+<td>中</td>
+</tr>
+</tbody></table>
+<p><strong>NB的关键优势：</strong></p>
+<ol>
+<li><p><strong>避免额外通信量增长</strong>：</p>
+<ul>
+<li>RHD在非2幂次节点时需要额外通信步骤</li>
+<li>NHR可能产生不均匀切片导致部分通信量增加</li>
+<li>NB通过动态调整每步数据量，最小化额外开销</li>
+</ul>
+</li>
+<li><p><strong>环状结构简单</strong>：</p>
+<ul>
+<li>相比NHR的N棵树，NB的环状结构更直观</li>
+<li>实现上更容易理解和调试</li>
+</ul>
+</li>
+<li><p><strong>数学精确性</strong>：</p>
+<ul>
+<li>通过精确公式计算每步数据量</li>
+<li>保证理论最优或接近最优的通信量</li>
+</ul>
+</li>
+</ol>
+<p><strong>适用场景：</strong></p>
+<ol>
+<li><strong>大规模集群</strong>：节点数任意，不受2的幂次限制</li>
+<li><strong>通信量敏感场景</strong>：需要严格控制通信量，避免额外开销</li>
+<li><strong>对数复杂度要求</strong>：要求⌈log₂p⌉步完成，接近理论最优</li>
+</ol>
+<p><strong>算法流程特点：</strong></p>
+<ul>
+<li><strong>逐步聚合</strong>：每一步都在前一步基础上聚合更多数据</li>
+<li><strong>步长倍增</strong>：1→2→4→…，类似二进制展开</li>
+<li><strong>非均匀但最优</strong>：虽然每步数据量可能不同，但总通信量接近理论下界</li>
+</ul>
+<p><strong>特点：</strong></p>
+<ul>
+<li><strong>时间复杂度：</strong> $O(\lceil \log_2 N \rceil)$</li>
+<li><strong>关键优势：</strong><ul>
+<li>不同节点数下均保持对数通信步数</li>
+<li>避免额外通信数据量增长（相比RHD）</li>
+</ul>
+</li>
+<li><strong>适用场景：</strong> 大规模集群，Server数量多</li>
+</ul>
+<h4 id="3-8-2-性能模型"><a href="#3-8-2-性能模型" class="headerlink" title="3.8.2 性能模型"></a>3.8.2 性能模型</h4><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>耗时公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ReduceScatter</td>
+<td>$\lceil \log_2 p \rceil\alpha + \frac{p-1}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>动态步长多重环，⌈log₂p⌉步，第k步传输⌊(p-1+2^k)&#x2F;2^(k+1)⌋份数据</td>
+</tr>
+<tr>
+<td>AllGather</td>
+<td>$\lceil \log_2 p \rceil\alpha + \frac{p-1}{p}n\beta$</td>
+<td>步长递增(1→2→4→…)，⌈log₂p⌉步，无额外通信量</td>
+</tr>
+<tr>
+<td>AllReduce</td>
+<td>$2\lceil \log_2 p \rceil\alpha + 2\frac{p-1}{p}n\beta + \frac{p-1}{p}n\gamma$</td>
+<td>ReduceScatter(⌈log₂p⌉步) + AllGather(⌈log₂p⌉步)</td>
+</tr>
+<tr>
+<td>Scatter</td>
+<td>$\lceil \log_2 p \rceil\alpha + \frac{p-1}{p}n\beta$</td>
+<td>动态步长散发，⌈log₂p⌉步完成，每步传输量不均匀</td>
+</tr>
+<tr>
+<td>Broadcast</td>
+<td>$2\lceil \log_2 p \rceil\alpha + 2\frac{p-1}{p}n\beta$</td>
+<td>Scatter(⌈log₂p⌉步) + AllGather(⌈log₂p⌉步)实现</td>
+</tr>
+</tbody></table>
+<h3 id="3-9-AHC-Asymmetric-Hierarchical-Concatenate-算法"><a href="#3-9-AHC-Asymmetric-Hierarchical-Concatenate-算法" class="headerlink" title="3.9 AHC (Asymmetric Hierarchical Concatenate) 算法"></a>3.9 AHC (Asymmetric Hierarchical Concatenate) 算法</h3><h4 id="3-9-1-算法原理"><a href="#3-9-1-算法原理" class="headerlink" title="3.9.1 算法原理"></a>3.9.1 算法原理</h4><p>层次化集合通信算法，专门处理非对称层次化网络拓扑。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;Phase 1: 组内ReduceScatter&quot;</span><br><span class="line">        A1[Group1: 2卡] --&gt; A2[并行ReduceScatter]</span><br><span class="line">        A3[Group2: 3卡] --&gt; A2</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Phase 2: 构建逻辑同号卡&quot;</span><br><span class="line">        B1[数据切分: LCM×G块] --&gt; B2[Group间对应关系]</span><br><span class="line">        B2 --&gt; B3[逻辑同号卡AllReduce]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Phase 3: 组内AllGather&quot;</span><br><span class="line">        C1[Group1 AllGather] --&gt; C2[完成]</span><br><span class="line">        C3[Group2 AllGather] --&gt; C2</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    A2 --&gt; B1</span><br><span class="line">    B3 --&gt; C1</span><br><span class="line">    B3 --&gt; C3</span><br><span class="line">    </span><br><span class="line">    Note1[LCM: 最小公倍数&lt;br/&gt;示例: 2和3 → LCM=6]</span><br></pre></td></tr></table></figure>
+
+<p><strong>特点：</strong></p>
+<ul>
+<li><strong>适用场景：</strong><ul>
+<li>层次化网络拓扑</li>
+<li>不同层次间NPU数量不对称</li>
+<li>层次间存在带宽收敛</li>
+</ul>
+</li>
+<li><strong>关键技术：</strong><ul>
+<li>基于拓扑的计算单元重新分组</li>
+<li>逻辑同号卡概念</li>
+<li>非均匀数据块切分</li>
+</ul>
+</li>
+</ul>
+<h4 id="3-9-2-执行流程示例（以AllReduce为例）"><a href="#3-9-2-执行流程示例（以AllReduce为例）" class="headerlink" title="3.9.2 执行流程示例（以AllReduce为例）"></a>3.9.2 执行流程示例（以AllReduce为例）</h4><p><strong>说明：</strong> AHC算法主要应用于AllReduce、ReduceScatter等需要跨层次通信的场景，此处以AllReduce为典型示例。</p>
+<p><strong>场景：</strong> 5个Rank，分为2组（Group1: 2卡，Group2: 3卡）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">sequenceDiagram</span><br><span class="line">    participant G1R0 as Group1-Rank0</span><br><span class="line">    participant G1R1 as Group1-Rank1</span><br><span class="line">    participant G2R0 as Group2-Rank0</span><br><span class="line">    participant G2R1 as Group2-Rank1</span><br><span class="line">    participant G2R2 as Group2-Rank2</span><br><span class="line">    </span><br><span class="line">    Note over G1R0,G2R2: Step 1: 组内ReduceScatter</span><br><span class="line">    G1R0-&gt;&gt;G1R1: ReduceScatter (2卡)</span><br><span class="line">    G2R0-&gt;&gt;G2R1: ReduceScatter (3卡)</span><br><span class="line">    G2R0-&gt;&gt;G2R2: ReduceScatter (3卡)</span><br><span class="line">    </span><br><span class="line">    Note over G1R0,G2R2: Step 2: 逻辑同号卡AllReduce</span><br><span class="line">    Note right of G1R0: 数据切分为LCM(2,3)×2=12块</span><br><span class="line">    G1R0-&gt;&gt;G2R0: 对应数据块AllReduce</span><br><span class="line">    G1R1-&gt;&gt;G2R1: 对应数据块AllReduce</span><br><span class="line">    </span><br><span class="line">    Note over G1R0,G2R2: Step 3: 组内AllGather</span><br><span class="line">    G1R0-&gt;&gt;G1R1: AllGather</span><br><span class="line">    G2R0-&gt;&gt;G2R1: AllGather</span><br><span class="line">    G2R0-&gt;&gt;G2R2: AllGather</span><br></pre></td></tr></table></figure>
+
+<p><strong>详细执行流程说明：</strong></p>
+<p>AHC算法专门解决<strong>层次化非对称网络拓扑</strong>的集合通信问题。当不同层次间的计算单元数量不对称时（如Group1有2卡，Group2有3卡），传统算法无法直接应用。AHC通过<strong>逻辑同号卡</strong>概念和<strong>LCM数据切分</strong>实现高效通信。</p>
+<p><strong>初始状态：</strong> </p>
+<ul>
+<li>Group1: Rank0和Rank1各持有完整数据[A,B,C,D,E,F]</li>
+<li>Group2: Rank0、Rank1、Rank2各持有完整数据[A,B,C,D,E,F]</li>
+<li>目标：所有5个Rank最终持有所有数据的规约结果</li>
+</ul>
+<p><strong>Phase 1: 组内ReduceScatter阶段</strong></p>
+<p>每个Group内部独立执行ReduceScatter，将数据规约并分散到各个成员节点。</p>
+<ul>
+<li><p><strong>Group1 (2卡) 执行</strong>：</p>
+<ul>
+<li>使用Ring或RHD算法在G1R0和G1R1间执行ReduceScatter</li>
+<li>G1R0持有前半部分规约结果：[A*, B*, C*]</li>
+<li>G1R1持有后半部分规约结果：[D*, E*, F*]</li>
+<li>注：此处的*表示Group1内部的局部规约（仅2个节点的规约）</li>
+</ul>
+</li>
+<li><p><strong>Group2 (3卡) 执行</strong>：</p>
+<ul>
+<li>使用Ring算法在G2R0、G2R1、G2R2间执行ReduceScatter</li>
+<li>G2R0持有第1份：[A*, B*]</li>
+<li>G2R1持有第2份：[C*, D*]</li>
+<li>G2R2持有第3份：[E*, F*]</li>
+<li>注：此处的*表示Group2内部的局部规约（仅3个节点的规约）</li>
+</ul>
+</li>
+<li><p><strong>阶段特点</strong>：各组内部并行执行，无跨组通信，充分利用组内高带宽链路</p>
+</li>
+</ul>
+<p><strong>Phase 2: 跨组逻辑同号卡AllReduce阶段</strong></p>
+<p>这是AHC算法的核心创新，通过<strong>LCM(Least Common Multiple)数据切分</strong>和<strong>逻辑同号卡映射</strong>实现跨组通信。</p>
+<ul>
+<li><p><strong>LCM切分原理</strong>：</p>
+<ul>
+<li>Group1有2卡，Group2有3卡，LCM(2,3) &#x3D; 6</li>
+<li>数据被切分为 LCM × G &#x3D; 6 × 2 &#x3D; 12 个逻辑块</li>
+<li>这样确保每个物理节点都能负责整数个逻辑块</li>
+</ul>
+</li>
+<li><p><strong>逻辑同号卡映射</strong>：</p>
+<ul>
+<li>G1R0（逻辑编号0）对应 G2R0（逻辑编号0）：负责块0-5的规约</li>
+<li>G1R1（逻辑编号1）对应 G2R1（逻辑编号1）：负责块6-11的规约</li>
+<li>G2R2作为额外节点，将其数据分配给对应的逻辑同号卡处理</li>
+</ul>
+</li>
+<li><p><strong>跨组AllReduce执行</strong>：</p>
+<ul>
+<li>G1R0 ↔ G2R0之间对对应数据块执行AllReduce（规约并交换结果）</li>
+<li>G1R1 ↔ G2R1之间对对应数据块执行AllReduce</li>
+<li>G2R2的数据通过环状通信或直接发送方式参与规约</li>
+<li>执行后，逻辑同号卡持有跨组完整规约结果</li>
+</ul>
+</li>
+<li><p><strong>阶段特点</strong>：跨组通信量最小化，仅在逻辑对应节点间进行，避免全连接通信</p>
+</li>
+</ul>
+<p><strong>Phase 3: 组内AllGather阶段</strong></p>
+<p>将跨组规约的结果在各组内部收集，使所有节点都持有完整的最终结果。</p>
+<ul>
+<li><p><strong>Group1 AllGather</strong>：</p>
+<ul>
+<li>G1R0和G1R1执行AllGather</li>
+<li>将各自持有的部分规约结果交换</li>
+<li>最终G1R0和G1R1都持有完整的全局规约结果[A*, B*, C*, D*, E*, F*]</li>
+</ul>
+</li>
+<li><p><strong>Group2 AllGather</strong>：</p>
+<ul>
+<li>G2R0、G2R1、G2R2执行AllGather</li>
+<li>三个节点间交换各自持有的规约结果</li>
+<li>最终所有节点都持有完整的全局规约结果[A*, B*, C*, D*, E*, F*]</li>
+</ul>
+</li>
+<li><p><strong>阶段特点</strong>：再次利用组内高带宽，快速完成数据广播，无额外规约计算</p>
+</li>
+</ul>
+<p><strong>AHC算法整体特点：</strong></p>
+<ol>
+<li><strong>非对称拓扑适应性</strong>：通过LCM切分解决不同组卡数不一致问题</li>
+<li><strong>三阶段分治</strong>：组内→跨组→组内，最小化高延迟跨组通信量</li>
+<li><strong>逻辑同号卡创新</strong>：虚拟化物理节点映射，实现负载均衡</li>
+<li><strong>带宽分层利用</strong>：组内用高带宽链路，跨组用有限带宽链路，充分适应收敛比网络</li>
+<li><strong>复杂度权衡</strong>：虽然增加了数据切分复杂度，但显著减少了跨层通信开销，在层次化网络中性能优异</li>
+</ol>
+<p><strong>典型应用场景：</strong></p>
+<ul>
+<li>多机多卡训练（机器间带宽 &lt;&lt; 机器内带宽）</li>
+<li>Pod内训练（Pod间带宽收敛）</li>
+<li>边缘计算集群（不同边缘节点计算能力不对称）</li>
+</ul>
+<h4 id="3-9-3-性能模型"><a href="#3-9-3-性能模型" class="headerlink" title="3.9.3 性能模型"></a>3.9.3 性能模型</h4><p>采用NB算法作为组内和组间算法时：</p>
+<p>$$<br>T_{ReduceScatter} &#x3D; 2(\lceil \log_2(m+d) \rceil + \lceil \log_2 G \rceil)\alpha + 2(\frac{m+d-1}{m+d} + \frac{(G-1)C}{Gm})n\beta + (\frac{m+d-1}{m+d} + \frac{G-1}{Gm})n\gamma<br>$$</p>
+<p><strong>参数说明：</strong></p>
+<ul>
+<li>m：最小分组卡数</li>
+<li>d：最大分组与最小分组的差值</li>
+<li>G：分组数</li>
+<li>C：组间带宽相对组内带宽的收敛比</li>
+</ul>
+<h3 id="3-10-Pipeline-算法"><a href="#3-10-Pipeline-算法" class="headerlink" title="3.10 Pipeline 算法"></a>3.10 Pipeline 算法</h3><h4 id="3-10-1-算法原理"><a href="#3-10-1-算法原理" class="headerlink" title="3.10.1 算法原理"></a>3.10.1 算法原理</h4><p>流水线并行算法，充分利用Server内和Server间链路的并发能力。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;传统分级算法&quot;</span><br><span class="line">        A1[Server间通信] --&gt; A2[链路利用率]</span><br><span class="line">        A2 --&gt; A3[Server内空闲]</span><br><span class="line">        A3 --&gt; A4[带宽浪费]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Pipeline算法&quot;</span><br><span class="line">        B1[Server间传输] -.并发.-&gt; B2[Server内传输]</span><br><span class="line">        B2 --&gt; B3[链路充分利用]</span><br><span class="line">        B3 --&gt; B4[带宽利用率提升]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    style A4 fill:#ffcccc</span><br><span class="line">    style B4 fill:#ccffcc</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心思想：</strong> 挖掘通信算法的数据依赖，通过流水并行解决带宽利用不足问题。</p>
+<h4 id="3-10-2-流水线执行示例（以AllGather为例）"><a href="#3-10-2-流水线执行示例（以AllGather为例）" class="headerlink" title="3.10.2 流水线执行示例（以AllGather为例）"></a>3.10.2 流水线执行示例（以AllGather为例）</h4><p><strong>说明：</strong> Pipeline算法主要应用于AllReduce、AllGather、ReduceScatter等大数据量场景，此处以AllGather为典型示例展示流水线并发机制。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">sequenceDiagram</span><br><span class="line">    participant S0R0 as Server0-Rank0</span><br><span class="line">    participant S0R1 as Server0-Rank1</span><br><span class="line">    participant S1R2 as Server1-Rank2</span><br><span class="line">    participant S1R3 as Server1-Rank3</span><br><span class="line">    </span><br><span class="line">    Note over S0R0,S1R3: Step 1: Server间Ring + Server内传输</span><br><span class="line">    S1R2-&gt;&gt;S0R0: 绿色块 (Server间)</span><br><span class="line">    S0R0-&gt;&gt;S0R1: 绿色块 (Server内并发)</span><br><span class="line">    </span><br><span class="line">    Note over S0R0,S1R3: Step 2: 继续Ring + Server内传输</span><br><span class="line">    S0R0-&gt;&gt;S1R2: 红色块 (Server间)</span><br><span class="line">    S0R0-&gt;&gt;S0R1: 上一步接收的块 (Server内)</span><br><span class="line">    S1R2-&gt;&gt;S1R3: 上一步接收的块 (Server内)</span><br><span class="line">    </span><br><span class="line">    Note over S0R0,S1R3: 每一步都实现Server间和Server内并发</span><br></pre></td></tr></table></figure>
+
+<p><strong>详细执行流程说明：</strong></p>
+<p>Pipeline算法的核心目标是<strong>解决带宽利用率不足问题</strong>，特别是在层次化网络拓扑中（Server内高带宽 + Server间低带宽），传统分级算法会导致某一时刻只有一层链路工作，另一层链路空闲。Pipeline通过<strong>挖掘数据依赖关系</strong>，实现跨层并发，充分利用所有链路带宽。</p>
+<p><strong>场景设置：</strong></p>
+<ul>
+<li>4个Rank分布在2个Server上：Server0包含Rank0和Rank1，Server1包含Rank2和Rank3</li>
+<li>Server内带宽：高（如NVLink 600GB&#x2F;s）</li>
+<li>Server间带宽：低（如RDMA 100Gb&#x2F;s &#x3D; 12.5GB&#x2F;s，收敛比约48:1）</li>
+<li>初始状态：每个Rank持有不同数据块，需执行AllGather收集所有数据</li>
+</ul>
+<p><strong>传统分级算法的问题：</strong></p>
+<ol>
+<li><strong>阶段1</strong>：Server间通信时，Server内链路完全空闲</li>
+<li><strong>阶段2</strong>：Server内通信时，Server间链路完全空闲</li>
+<li><strong>结果</strong>：链路利用率低，总时间 &#x3D; Server间时间 + Server内时间</li>
+</ol>
+<p><strong>Pipeline算法的创新：</strong></p>
+<p>通过<strong>数据依赖分析</strong>，发现：当Rank0从Rank2接收到一个数据块后，可以<strong>立即</strong>将该数据块转发给Server内的Rank1，而无需等待所有Server间通信完成。这样Server间和Server内通信可以<strong>流水线并发</strong>。</p>
+<p><strong>Step-by-Step执行流程（AllGather示例）：</strong></p>
+<p><strong>初始状态：</strong></p>
+<ul>
+<li>S0R0持有：[红色块]</li>
+<li>S0R1持有：[蓝色块]</li>
+<li>S1R2持有：[绿色块]</li>
+<li>S1R3持有：[黄色块]</li>
+<li>目标：所有Rank持有[红、蓝、绿、黄]全部数据</li>
+</ul>
+<p><strong>Step 1：第一轮并发传输</strong></p>
+<ul>
+<li><p><strong>Server间Ring通信</strong>：</p>
+<ul>
+<li>S1R2 → S0R0：发送绿色块（跨Server，走低带宽链路）</li>
+<li>S0R0 → S1R2：发送红色块（跨Server）</li>
+</ul>
+</li>
+<li><p><strong>Server内并发通信</strong>（与上述同时进行）：</p>
+<ul>
+<li>S0R0 → S0R1：发送红色块（Server内，走高带宽链路）</li>
+<li>S1R2 → S1R3：发送绿色块（Server内）</li>
+</ul>
+</li>
+<li><p><strong>Step 1后状态</strong>：</p>
+<ul>
+<li>S0R0：[红、绿]</li>
+<li>S0R1：[蓝、红]</li>
+<li>S1R2：[绿、红]</li>
+<li>S1R3：[黄、绿]</li>
+</ul>
+</li>
+<li><p><strong>并发效果</strong>：Server间传输绿色块的同时，Server内也在传输红色&#x2F;绿色块，两层链路都在工作</p>
+</li>
+</ul>
+<p><strong>Step 2：第二轮并发传输</strong></p>
+<ul>
+<li><p><strong>Server间Ring通信</strong>：</p>
+<ul>
+<li>S0R0 → S1R2：发送[红、绿]中的绿色块（S0R0刚收到的）</li>
+<li>S1R2 → S0R0：发送[绿、红]中的红色块</li>
+<li>注意：S0R0可以立即转发上一步刚收到的绿色块，无需等待</li>
+</ul>
+</li>
+<li><p><strong>Server内并发通信</strong>：</p>
+<ul>
+<li>S0R0 → S0R1：发送绿色块（S0R0在Step 1收到的）</li>
+<li>S0R1 → S0R0：发送蓝色块</li>
+<li>S1R2 → S1R3：发送红色块（S1R2在Step 1收到的）</li>
+<li>S1R3 → S1R2：发送黄色块</li>
+</ul>
+</li>
+<li><p><strong>Step 2后状态</strong>：</p>
+<ul>
+<li>S0R0：[红、绿、蓝]</li>
+<li>S0R1：[蓝、红、绿]</li>
+<li>S1R2：[绿、红、黄]</li>
+<li>S1R3：[黄、绿、红]</li>
+</ul>
+</li>
+</ul>
+<p><strong>Step 3：第三轮并发传输</strong></p>
+<ul>
+<li><p><strong>Server间Ring通信</strong>：</p>
+<ul>
+<li>S0R0 → S1R2：发送蓝色块</li>
+<li>S1R2 → S0R0：发送黄色块</li>
+</ul>
+</li>
+<li><p><strong>Server内并发通信</strong>：</p>
+<ul>
+<li>S0R0 → S0R1：发送蓝色块或黄色块</li>
+<li>S1R2 → S1R3：发送蓝色块或黄色块</li>
+</ul>
+</li>
+<li><p><strong>最终状态</strong>：所有Rank持有[红、蓝、绿、黄]完整数据</p>
+</li>
+</ul>
+<p><strong>Pipeline核心机制：</strong></p>
+<ol>
+<li><strong>数据流水</strong>：数据块像流水线一样流动，刚到达的数据立即转发，无需等待批次完成</li>
+<li><strong>双层并发</strong>：每个时间片内，Server间和Server内链路同时传输不同数据</li>
+<li><strong>依赖解耦</strong>：通过分析数据依赖，将”Server间完成→Server内开始”的串行依赖解耦为并发</li>
+<li><strong>带宽充分利用</strong>：高带宽链路（Server内）和低带宽链路（Server间）同时工作，总时间约等于 max(Server间时间, Server内时间)，而非二者之和</li>
+</ol>
+<p><strong>性能对比（假设数据量S，Server间带宽β_inter，Server内带宽β_intra）：</strong></p>
+<ul>
+<li><strong>传统分级算法总时间</strong>：$T &#x3D; \frac{S}{\beta_{inter}} + \frac{S}{\beta_{intra}}$</li>
+<li><strong>Pipeline算法总时间</strong>：$T \approx \max(\frac{S}{\beta_{inter}}, \frac{S}{\beta_{intra}})$</li>
+<li><strong>加速比</strong>：当 β_intra &gt;&gt; β_inter 时，加速比接近 $\frac{\beta_{intra} + \beta_{inter}}{\beta_{intra}} \approx 1 + \frac{\beta_{inter}}{\beta_{intra}}$</li>
+</ul>
+<p>例如收敛比48:1的场景，理论加速比可达1.02倍，但实际大数据量场景下加速更明显。</p>
+<p><strong>Pipeline算法特点：</strong></p>
+<ol>
+<li><strong>适用场景广泛</strong>：AllReduce、AllGather、ReduceScatter等多种原语都可应用</li>
+<li><strong>收敛比敏感</strong>：收敛比越大（Server内外带宽差异越大），Pipeline优势越明显</li>
+<li><strong>实现复杂度高</strong>：需要精细管理数据依赖和调度，代码复杂度较高</li>
+<li><strong>内存开销</strong>：需要额外缓冲区存储流水线中的中间数据</li>
+<li><strong>延迟隐藏</strong>：通过并发隐藏跨层通信延迟，特别适合大数据量场景</li>
+</ol>
+<p><strong>关键特性：</strong></p>
+<ul>
+<li><strong>AllReduce</strong>: Server间Ring(ReduceScatter+AllGather) 并发 Server内FullMesh</li>
+<li><strong>ReduceScatter</strong>: Server间Ring 并发 Server内传输</li>
+<li><strong>AllGather</strong>: Server间Ring 并发 Server内传输</li>
+</ul>
+<h4 id="3-10-3-性能模型"><a href="#3-10-3-性能模型" class="headerlink" title="3.10.3 性能模型"></a>3.10.3 性能模型</h4><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>耗时公式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ReduceScatter</td>
+<td>$\max(\frac{s}{p}\beta_{inter} + \alpha_{inter}, \frac{s}{p}\beta_{intra} + \alpha_{intra}) \times (p_{inter}-1) + \frac{s}{p}\beta_{intra} + \alpha_{intra}$</td>
+<td>Server间Ring和Server内Mesh并发，每步取较慢者，最后补一次Server内传输</td>
+</tr>
+<tr>
+<td>AllGather</td>
+<td>$\max(\frac{s}{p}\beta_{inter} + \alpha_{inter}, \frac{s}{p}\beta_{intra} + \alpha_{intra}) \times (p_{inter}-1) + \frac{s}{p}\beta_{intra} + \alpha_{intra}$</td>
+<td>与ReduceScatter对称，流水线式并发收集数据</td>
+</tr>
+<tr>
+<td>AllReduce</td>
+<td>$2 \times (\max(\frac{s}{p}\beta_{inter} + \alpha_{inter}, \frac{s}{p}\beta_{intra} + \alpha_{intra}) \times (p_{inter}-1) + \frac{s}{p}\beta_{intra} + \alpha_{intra})$</td>
+<td>ReduceScatter + AllGather，两阶段流水并发充分利用带宽</td>
+</tr>
+</tbody></table>
+<p><strong>参数说明：</strong></p>
+<ul>
+<li>s：总数据量</li>
+<li>p：总卡数</li>
+<li>$p_{inter}$：Server数量</li>
+<li>$\beta_{inter}$、$\alpha_{inter}$：Server间链路参数</li>
+<li>$\beta_{intra}$、$\alpha_{intra}$：Server内链路参数</li>
+</ul>
+<h3 id="3-11-算法选择策略"><a href="#3-11-算法选择策略" class="headerlink" title="3.11 算法选择策略"></a>3.11 算法选择策略</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">graph TD</span><br><span class="line">    Start[集合通信请求] --&gt; CheckScope&#123;通信范围&#125;</span><br><span class="line">    </span><br><span class="line">    CheckScope --&gt;|Server内| IntraServer[Server内算法选择]</span><br><span class="line">    CheckScope --&gt;|Server间| InterServer[Server间算法选择]</span><br><span class="line">    </span><br><span class="line">    IntraServer --&gt; CheckSize1&#123;数据量&#125;</span><br><span class="line">    CheckSize1 --&gt;|小| Star[Star算法]</span><br><span class="line">    CheckSize1 --&gt;|大| Mesh[Mesh算法]</span><br><span class="line">    </span><br><span class="line">    InterServer --&gt; CheckOp&#123;算子类型&#125;</span><br><span class="line">    </span><br><span class="line">    CheckOp --&gt;|AllToAll系列| PairWise[PairWise算法]</span><br><span class="line">    CheckOp --&gt;|其他| CheckNodes&#123;节点数&#125;</span><br><span class="line">    </span><br><span class="line">    CheckNodes --&gt;|小规模| Ring[Ring算法]</span><br><span class="line">    CheckNodes --&gt;|大规模| CheckPower&#123;是否2的幂&#125;</span><br><span class="line">    </span><br><span class="line">    CheckPower --&gt;|是| RHD[RHD算法]</span><br><span class="line">    CheckPower --&gt;|否| CheckData&#123;数据量&#125;</span><br><span class="line">    </span><br><span class="line">    CheckData --&gt;|小| RHD</span><br><span class="line">    CheckData --&gt;|大| NHR_NB&#123;NHR或NB&#125;</span><br><span class="line">    </span><br><span class="line">    CheckNodes --&gt;|层次化&lt;br/&gt;非对称| AHC[AHC算法]</span><br><span class="line">    </span><br><span class="line">    CheckSize1 --&gt;|大数据量&lt;br/&gt;多机多卡| Pipeline[Pipeline算法]</span><br><span class="line">    </span><br><span class="line">    style Star fill:#ffe6e6</span><br><span class="line">    style Mesh fill:#ffe6e6</span><br><span class="line">    style Ring fill:#e6f3ff</span><br><span class="line">    style RHD fill:#e6f3ff</span><br><span class="line">    style PairWise fill:#fff4e6</span><br><span class="line">    style NHR_NB fill:#e6ffe6</span><br><span class="line">    style AHC fill:#f3e6ff</span><br><span class="line">    style Pipeline fill:#ffffcc</span><br></pre></td></tr></table></figure>
+
+<h2 id="4-集合通信原语"><a href="#4-集合通信原语" class="headerlink" title="4. 集合通信原语"></a>4. 集合通信原语</h2><h3 id="4-1-核心原语列表"><a href="#4-1-核心原语列表" class="headerlink" title="4.1 核心原语列表"></a>4.1 核心原语列表</h3><table>
+<thead>
+<tr>
+<th>原语</th>
+<th>描述</th>
+<th>主要算法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>AllReduce</strong></td>
+<td>所有节点规约后广播结果</td>
+<td>Mesh, Ring, RHD, NHR, NB, AHC, Pipeline</td>
+</tr>
+<tr>
+<td><strong>AllGather</strong></td>
+<td>所有节点收集全部数据</td>
+<td>Mesh, Ring, RHD, NHR, NB, Pipeline</td>
+</tr>
+<tr>
+<td><strong>ReduceScatter</strong></td>
+<td>规约后散发到各节点</td>
+<td>Mesh, Ring, RHD, NHR, NB, AHC, Pipeline</td>
+</tr>
+<tr>
+<td><strong>Broadcast</strong></td>
+<td>根节点向所有节点广播</td>
+<td>Mesh, Ring, RHD, NHR, NB, Star</td>
+</tr>
+<tr>
+<td><strong>Reduce</strong></td>
+<td>所有节点向根节点规约</td>
+<td>Mesh, Ring, RHD, Star</td>
+</tr>
+<tr>
+<td><strong>Scatter</strong></td>
+<td>根节点散发数据到各节点</td>
+<td>Mesh, Ring, NHR, NB, Star</td>
+</tr>
+<tr>
+<td><strong>Gather</strong></td>
+<td>所有节点向根节点收集</td>
+<td>Mesh, Ring, Star</td>
+</tr>
+<tr>
+<td><strong>AllToAll</strong></td>
+<td>所有节点间全交换</td>
+<td>PairWise</td>
+</tr>
+<tr>
+<td><strong>AllToAllV</strong></td>
+<td>所有节点间变长全交换</td>
+<td>PairWise</td>
+</tr>
+</tbody></table>
+<h3 id="4-2-原语语义说明"><a href="#4-2-原语语义说明" class="headerlink" title="4.2 原语语义说明"></a>4.2 原语语义说明</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    subgraph &quot;AllReduce&quot;</span><br><span class="line">        AR1[R0:A0] --&gt; ARS[Sum]</span><br><span class="line">        AR2[R1:A1] --&gt; ARS</span><br><span class="line">        AR3[R2:A2] --&gt; ARS</span><br><span class="line">        ARS --&gt; ARR1[R0:Sum]</span><br><span class="line">        ARS --&gt; ARR2[R1:Sum]</span><br><span class="line">        ARS --&gt; ARR3[R2:Sum]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;AllGather&quot;</span><br><span class="line">        AG1[R0:A0] --&gt; AGR1[R0:A0+A1+A2]</span><br><span class="line">        AG2[R1:A1] --&gt; AGR2[R1:A0+A1+A2]</span><br><span class="line">        AG3[R2:A2] --&gt; AGR3[R2:A0+A1+A2]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;ReduceScatter&quot;</span><br><span class="line">        RS1[R0:A0] --&gt; RSS[Sum切分]</span><br><span class="line">        RS2[R1:A1] --&gt; RSS</span><br><span class="line">        RS3[R2:A2] --&gt; RSS</span><br><span class="line">        RSS --&gt; RSR1[R0:Sum_part0]</span><br><span class="line">        RSS --&gt; RSR2[R1:Sum_part1]</span><br><span class="line">        RSS --&gt; RSR3[R2:Sum_part2]</span><br><span class="line">    end</span><br></pre></td></tr></table></figure>
+
+<h2 id="5-通信框架设计"><a href="#5-通信框架设计" class="headerlink" title="5. 通信框架设计"></a>5. 通信框架设计</h2><h3 id="5-1-通信域管理"><a href="#5-1-通信域管理" class="headerlink" title="5.1 通信域管理"></a>5.1 通信域管理</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">classDiagram</span><br><span class="line">    class Communicator &#123;</span><br><span class="line">        -int commId</span><br><span class="line">        -int rank</span><br><span class="line">        -int size</span><br><span class="line">        -CommunicatorType type</span><br><span class="line">        +Create()</span><br><span class="line">        +Destroy()</span><br><span class="line">        +GetRank()</span><br><span class="line">        +GetSize()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class CommunicatorGroup &#123;</span><br><span class="line">        -List~Communicator~ comms</span><br><span class="line">        +CreateGroup()</span><br><span class="line">        +SplitGroup()</span><br><span class="line">        +FreeGroup()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class RankInfo &#123;</span><br><span class="line">        -int rankId</span><br><span class="line">        -int deviceId</span><br><span class="line">        -string hostName</span><br><span class="line">        -NetworkInfo netInfo</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    Communicator &quot;1&quot; --&gt; &quot;*&quot; RankInfo</span><br><span class="line">    CommunicatorGroup &quot;1&quot; --&gt; &quot;*&quot; Communicator</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-算子执行流程"><a href="#5-2-算子执行流程" class="headerlink" title="5.2 算子执行流程"></a>5.2 算子执行流程</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">sequenceDiagram</span><br><span class="line">    participant User as 用户调用</span><br><span class="line">    participant Framework as 通信框架</span><br><span class="line">    participant AlgoSelector as 算法选择器</span><br><span class="line">    participant Algorithm as 通信算法</span><br><span class="line">    participant Platform as 通信平台</span><br><span class="line">    </span><br><span class="line">    User-&gt;&gt;Framework: HcclAllReduce(...)</span><br><span class="line">    Framework-&gt;&gt;Framework: 参数校验</span><br><span class="line">    Framework-&gt;&gt;AlgoSelector: 请求算法选择</span><br><span class="line">    </span><br><span class="line">    AlgoSelector-&gt;&gt;AlgoSelector: 分析通信域信息</span><br><span class="line">    AlgoSelector-&gt;&gt;AlgoSelector: 评估数据量</span><br><span class="line">    AlgoSelector-&gt;&gt;AlgoSelector: 应用选择策略</span><br><span class="line">    AlgoSelector--&gt;&gt;Framework: 返回算法类型</span><br><span class="line">    </span><br><span class="line">    Framework-&gt;&gt;Algorithm: 执行算法</span><br><span class="line">    Algorithm-&gt;&gt;Algorithm: 计算资源需求</span><br><span class="line">    Algorithm-&gt;&gt;Algorithm: 生成任务编排</span><br><span class="line">    </span><br><span class="line">    Algorithm-&gt;&gt;Platform: 申请资源</span><br><span class="line">    Platform--&gt;&gt;Algorithm: 返回资源句柄</span><br><span class="line">    </span><br><span class="line">    Algorithm-&gt;&gt;Platform: 下发任务</span><br><span class="line">    Platform-&gt;&gt;Platform: 执行通信</span><br><span class="line">    Platform--&gt;&gt;Algorithm: 返回执行结果</span><br><span class="line">    </span><br><span class="line">    Algorithm--&gt;&gt;Framework: 算法执行完成</span><br><span class="line">    Framework--&gt;&gt;User: 返回结果</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-3-算法选择器设计"><a href="#5-3-算法选择器设计" class="headerlink" title="5.3 算法选择器设计"></a>5.3 算法选择器设计</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    Input[输入参数] --&gt; Analyzer[参数分析器]</span><br><span class="line">    </span><br><span class="line">    Analyzer --&gt; Topo[拓扑信息分析]</span><br><span class="line">    Analyzer --&gt; Data[数据量分析]</span><br><span class="line">    Analyzer --&gt; Op[算子类型分析]</span><br><span class="line">    </span><br><span class="line">    Topo --&gt; Rules[选择规则库]</span><br><span class="line">    Data --&gt; Rules</span><br><span class="line">    Op --&gt; Rules</span><br><span class="line">    </span><br><span class="line">    Rules --&gt; Model[性能模型评估]</span><br><span class="line">    Model --&gt; Decision[决策引擎]</span><br><span class="line">    </span><br><span class="line">    Decision --&gt; Output[输出算法]</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;规则库&quot;</span><br><span class="line">        R1[拓扑规则]</span><br><span class="line">        R2[数据量规则]</span><br><span class="line">        R3[算子规则]</span><br><span class="line">        R4[历史优化]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Rules -.包含.-&gt; R1</span><br><span class="line">    Rules -.包含.-&gt; R2</span><br><span class="line">    Rules -.包含.-&gt; R3</span><br><span class="line">    Rules -.包含.-&gt; R4</span><br></pre></td></tr></table></figure>
+
+<h2 id="6-编译与构建系统"><a href="#6-编译与构建系统" class="headerlink" title="6. 编译与构建系统"></a>6. 编译与构建系统</h2><h3 id="6-1-编译流程"><a href="#6-1-编译流程" class="headerlink" title="6.1 编译流程"></a>6.1 编译流程</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    Start[开始编译] --&gt; CheckEnv&#123;检查环境&#125;</span><br><span class="line">    </span><br><span class="line">    CheckEnv --&gt;|CANN已安装| CheckDeps[检查依赖]</span><br><span class="line">    CheckEnv --&gt;|未安装| Error1[报错退出]</span><br><span class="line">    </span><br><span class="line">    CheckDeps --&gt; CMake[CMake配置]</span><br><span class="line">    CMake --&gt; Gen[生成构建文件]</span><br><span class="line">    </span><br><span class="line">    Gen --&gt; CompileKernel&#123;编译模式&#125;</span><br><span class="line">    </span><br><span class="line">    CompileKernel --&gt;|--aicpu| Kernel[编译ccl_kernel.so]</span><br><span class="line">    CompileKernel --&gt;|默认| Full[完整编译]</span><br><span class="line">    </span><br><span class="line">    Kernel --&gt; InstallK[安装Kernel]</span><br><span class="line">    Full --&gt; CompileFramework[编译通信框架]</span><br><span class="line">    CompileFramework --&gt; CompileAlgo[编译通信算法]</span><br><span class="line">    CompileAlgo --&gt; Package[打包.run文件]</span><br><span class="line">    </span><br><span class="line">    Package --&gt; Output[生成输出]</span><br><span class="line">    InstallK --&gt; Output</span><br><span class="line">    </span><br><span class="line">    Output --&gt; End[编译完成]</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-2-主要编译选项"><a href="#6-2-主要编译选项" class="headerlink" title="6.2 主要编译选项"></a>6.2 主要编译选项</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 基础编译</span></span><br><span class="line">bash build.sh --nlohmann_path /path/to/nlohmann/include</span><br><span class="line"></span><br><span class="line"><span class="comment"># 仅编译AICPU Kernel</span></span><br><span class="line">bash build.sh --nlohmann_path /path --aicpu</span><br><span class="line"></span><br><span class="line"><span class="comment"># 编译并运行测试</span></span><br><span class="line">bash build.sh --nlohmann_path /path --<span class="built_in">test</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 使能地址消毒器（用于内存检测）</span></span><br><span class="line">bash build.sh --nlohmann_path /path --asan</span><br><span class="line"></span><br><span class="line"><span class="comment"># 使能代码覆盖率</span></span><br><span class="line">bash build.sh --nlohmann_path /path --cov</span><br><span class="line"></span><br><span class="line"><span class="comment"># 指定CANN包路径</span></span><br><span class="line">bash build.sh --nlohmann_path /path -p /usr/local/Ascend/ascend-toolkit/latest</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-3-依赖关系"><a href="#6-3-依赖关系" class="headerlink" title="6.3 依赖关系"></a>6.3 依赖关系</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    HCCL[HCCL库] --&gt; CANN[CANN开发套件包]</span><br><span class="line">    HCCL --&gt; SDK[CANN SDK包]</span><br><span class="line">    HCCL --&gt; JSON[nlohmann/json]</span><br><span class="line">    </span><br><span class="line">    CANN --&gt; Runtime[CANN Runtime]</span><br><span class="line">    CANN --&gt; Driver[NPU驱动]</span><br><span class="line">    CANN --&gt; Firmware[NPU固件]</span><br><span class="line">    </span><br><span class="line">    SDK --&gt; GTest[Google Test]</span><br><span class="line">    </span><br><span class="line">    Build[构建系统] --&gt; Python[Python ≥ 3.7]</span><br><span class="line">    Build --&gt; GCC[GCC ≥ 7.3]</span><br><span class="line">    Build --&gt; CMake[CMake ≥ 3.16]</span><br><span class="line">    </span><br><span class="line">    style HCCL fill:#ff6b6b</span><br><span class="line">    style CANN fill:#4ecdc4</span><br><span class="line">    style SDK fill:#95e1d3</span><br><span class="line">    style JSON fill:#f38181</span><br></pre></td></tr></table></figure>
+
+<h2 id="7-测试与验证"><a href="#7-测试与验证" class="headerlink" title="7. 测试与验证"></a>7. 测试与验证</h2><h3 id="7-1-测试分层架构"><a href="#7-1-测试分层架构" class="headerlink" title="7.1 测试分层架构"></a>7.1 测试分层架构</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;单元测试层&quot;</span><br><span class="line">        UT1[算法单元测试]</span><br><span class="line">        UT2[框架单元测试]</span><br><span class="line">        UT3[工具类单元测试]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;集成测试层&quot;</span><br><span class="line">        IT1[算子集成测试]</span><br><span class="line">        IT2[多算法联合测试]</span><br><span class="line">        IT3[异常场景测试]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;系统测试层&quot;</span><br><span class="line">        ST1[单机多卡测试]</span><br><span class="line">        ST2[多机多卡测试]</span><br><span class="line">        ST3[性能基准测试]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;工具测试层&quot;</span><br><span class="line">        TT1[HCCL Test工具]</span><br><span class="line">        TT2[性能分析工具]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    UT1 --&gt; IT1</span><br><span class="line">    UT2 --&gt; IT2</span><br><span class="line">    UT3 --&gt; IT3</span><br><span class="line">    </span><br><span class="line">    IT1 --&gt; ST1</span><br><span class="line">    IT2 --&gt; ST2</span><br><span class="line">    IT3 --&gt; ST3</span><br><span class="line">    </span><br><span class="line">    ST1 --&gt; TT1</span><br><span class="line">    ST2 --&gt; TT1</span><br><span class="line">    ST3 --&gt; TT2</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-2-HCCL-Test-工具"><a href="#7-2-HCCL-Test-工具" class="headerlink" title="7.2 HCCL Test 工具"></a>7.2 HCCL Test 工具</h3><p><strong>功能测试示例：</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 8卡AllReduce功能测试</span></span><br><span class="line">mpirun -n 8 ./bin/all_reduce_test -b 8K -e 64M -f 2 -d fp32 -o <span class="built_in">sum</span> -p 8</span><br></pre></td></tr></table></figure>
+
+<p><strong>参数说明：</strong></p>
+<ul>
+<li><code>-b</code>: 起始数据量（8KB）</li>
+<li><code>-e</code>: 结束数据量（64MB）</li>
+<li><code>-f</code>: 增量系数（每次2倍）</li>
+<li><code>-d</code>: 数据类型（fp32）</li>
+<li><code>-o</code>: 规约操作（sum）</li>
+<li><code>-p</code>: 参与NPU数量（8）</li>
+</ul>
+<p><strong>输出指标：</strong></p>
+<ul>
+<li><code>check_result</code>: 功能正确性（success&#x2F;fail）</li>
+<li><code>aveg_time</code>: 平均执行时间（微秒）</li>
+<li><code>alg_bandwidth</code>: 算法带宽（GB&#x2F;s）</li>
+<li><code>data_size</code>: 单NPU数据量（Bytes）</li>
+</ul>
+<h3 id="7-3-LLT测试命令"><a href="#7-3-LLT测试命令" class="headerlink" title="7.3 LLT测试命令"></a>7.3 LLT测试命令</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 运行所有LLT测试</span></span><br><span class="line">sh build.sh --nlohmann_path /path/to/nlohmann/include --<span class="built_in">test</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 运行特定测试套件</span></span><br><span class="line">sh build.sh --nlohmann_path /path --open_hccl_test</span><br><span class="line">sh build.sh --nlohmann_path /path --executor_hccl_test</span><br><span class="line">sh build.sh --nlohmann_path /path --executor_reduce_hccl_test</span><br><span class="line">sh build.sh --nlohmann_path /path --executor_pipeline_hccl_test</span><br><span class="line"></span><br><span class="line"><span class="comment"># 使能内存检测</span></span><br><span class="line">sh build.sh --nlohmann_path /path --<span class="built_in">test</span> --asan</span><br></pre></td></tr></table></figure>
+
+<h2 id="8-性能优化策略"><a href="#8-性能优化策略" class="headerlink" title="8. 性能优化策略"></a>8. 性能优化策略</h2><h3 id="8-1-算法级优化"><a href="#8-1-算法级优化" class="headerlink" title="8.1 算法级优化"></a>8.1 算法级优化</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">mindmap</span><br><span class="line">  root((性能优化))</span><br><span class="line">    算法选择</span><br><span class="line">      拓扑感知</span><br><span class="line">      数据量自适应</span><br><span class="line">      负载均衡</span><br><span class="line">    内存优化</span><br><span class="line">      零拷贝技术</span><br><span class="line">      内存池管理</span><br><span class="line">      DMA直接访问</span><br><span class="line">    并发优化</span><br><span class="line">      流水线并行</span><br><span class="line">      多流并发</span><br><span class="line">      异步执行</span><br><span class="line">    网络优化</span><br><span class="line">      拥塞控制</span><br><span class="line">      流量调度</span><br><span class="line">      QoS保证</span><br></pre></td></tr></table></figure>
+
+<h3 id="8-2-关键性能指标"><a href="#8-2-关键性能指标" class="headerlink" title="8.2 关键性能指标"></a>8.2 关键性能指标</h3><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>说明</th>
+<th>目标</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>带宽利用率</strong></td>
+<td>实际带宽&#x2F;理论带宽</td>
+<td>&gt; 90%</td>
+</tr>
+<tr>
+<td><strong>通信延迟</strong></td>
+<td>端到端通信时间</td>
+<td>最小化</td>
+</tr>
+<tr>
+<td><strong>可扩展性</strong></td>
+<td>节点数增加时的性能保持</td>
+<td>接近线性</td>
+</tr>
+<tr>
+<td><strong>负载均衡</strong></td>
+<td>各节点负载方差</td>
+<td>&lt; 10%</td>
+</tr>
+<tr>
+<td><strong>内存开销</strong></td>
+<td>额外内存消耗</td>
+<td>&lt; 20%</td>
+</tr>
+</tbody></table>
+<h3 id="8-3-性能调优参数"><a href="#8-3-性能调优参数" class="headerlink" title="8.3 性能调优参数"></a>8.3 性能调优参数</h3><p><strong>环境变量：</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 算法选择策略</span></span><br><span class="line"><span class="built_in">export</span> HCCL_ALGO=&lt;algo_name&gt;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 流水线深度</span></span><br><span class="line"><span class="built_in">export</span> HCCL_PIPELINE_DEPTH=&lt;depth&gt;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 并发流数量</span></span><br><span class="line"><span class="built_in">export</span> HCCL_STREAM_NUM=&lt;num&gt;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 日志级别</span></span><br><span class="line"><span class="built_in">export</span> ASCEND_SLOG_PRINT_TO_STDOUT=1</span><br><span class="line"><span class="built_in">export</span> ASCEND_GLOBAL_LOG_LEVEL=&lt;level&gt;</span><br></pre></td></tr></table></figure>
+
+<h2 id="9-安全与可靠性"><a href="#9-安全与可靠性" class="headerlink" title="9. 安全与可靠性"></a>9. 安全与可靠性</h2><h3 id="9-1-安全措施"><a href="#9-1-安全措施" class="headerlink" title="9.1 安全措施"></a>9.1 安全措施</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;编译安全&quot;</span><br><span class="line">        S1[栈保护 -fstack-protector]</span><br><span class="line">        S2[位置无关代码 -fPIC]</span><br><span class="line">        S3[RELRO保护]</span><br><span class="line">        S4[NX保护]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;运行安全&quot;</span><br><span class="line">        R1[输入参数校验]</span><br><span class="line">        R2[内存边界检查]</span><br><span class="line">        R3[资源泄漏检测]</span><br><span class="line">        R4[异常捕获与处理]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;通信安全&quot;</span><br><span class="line">        C1[端口认证]</span><br><span class="line">        C2[数据完整性校验]</span><br><span class="line">        C3[访问控制]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    S1 --&gt; Build[构建产物]</span><br><span class="line">    S2 --&gt; Build</span><br><span class="line">    S3 --&gt; Build</span><br><span class="line">    S4 --&gt; Build</span><br><span class="line">    </span><br><span class="line">    Build --&gt; Deploy[部署]</span><br><span class="line">    </span><br><span class="line">    R1 --&gt; Runtime[运行时]</span><br><span class="line">    R2 --&gt; Runtime</span><br><span class="line">    R3 --&gt; Runtime</span><br><span class="line">    R4 --&gt; Runtime</span><br><span class="line">    </span><br><span class="line">    Deploy --&gt; Runtime</span><br><span class="line">    </span><br><span class="line">    C1 --&gt; Comm[通信层]</span><br><span class="line">    C2 --&gt; Comm</span><br><span class="line">    C3 --&gt; Comm</span><br><span class="line">    </span><br><span class="line">    Runtime --&gt; Comm</span><br></pre></td></tr></table></figure>
+
+<h3 id="9-2-错误处理机制"><a href="#9-2-错误处理机制" class="headerlink" title="9.2 错误处理机制"></a>9.2 错误处理机制</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">stateDiagram-v2</span><br><span class="line">    [*] --&gt; Normal: 初始化</span><br><span class="line">    Normal --&gt; DetectError: 检测到错误</span><br><span class="line">    DetectError --&gt; Classify: 分类错误</span><br><span class="line">    </span><br><span class="line">    Classify --&gt; Recoverable: 可恢复错误</span><br><span class="line">    Classify --&gt; Fatal: 致命错误</span><br><span class="line">    </span><br><span class="line">    Recoverable --&gt; Retry: 重试机制</span><br><span class="line">    Retry --&gt; Success: 重试成功</span><br><span class="line">    Retry --&gt; Fallback: 重试失败</span><br><span class="line">    Fallback --&gt; Alternative: 切换备用方案</span><br><span class="line">    Alternative --&gt; Normal</span><br><span class="line">    </span><br><span class="line">    Success --&gt; Normal</span><br><span class="line">    </span><br><span class="line">    Fatal --&gt; Log: 记录日志</span><br><span class="line">    Log --&gt; Cleanup: 资源清理</span><br><span class="line">    Cleanup --&gt; [*]: 退出</span><br></pre></td></tr></table></figure>
+
+<h3 id="9-3-日志与调试"><a href="#9-3-日志与调试" class="headerlink" title="9.3 日志与调试"></a>9.3 日志与调试</h3><p><strong>日志级别：</strong></p>
+<ul>
+<li>ERROR: 错误信息</li>
+<li>WARNING: 警告信息</li>
+<li>INFO: 一般信息</li>
+<li>DEBUG: 调试信息</li>
+</ul>
+<p><strong>关键日志点：</strong></p>
+<ol>
+<li>通信域创建&#x2F;销毁</li>
+<li>算法选择决策</li>
+<li>资源申请&#x2F;释放</li>
+<li>任务执行状态</li>
+<li>性能统计信息</li>
+</ol>
+<h2 id="10-版本管理与兼容性"><a href="#10-版本管理与兼容性" class="headerlink" title="10. 版本管理与兼容性"></a>10. 版本管理与兼容性</h2><h3 id="10-1-版本策略"><a href="#10-1-版本策略" class="headerlink" title="10.1 版本策略"></a>10.1 版本策略</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">timeline</span><br><span class="line">    title HCCL版本演进</span><br><span class="line">    section CANN 8.x</span><br><span class="line">        标签v8.0.0 : 基础算法 : Mesh/Ring/RHD</span><br><span class="line">        标签v8.0.1 : 新增PairWise/Star</span><br><span class="line">    section CANN 9.x</span><br><span class="line">        标签v9.0.0 : 新增NHR/NB</span><br><span class="line">        标签v9.0.1 : 新增AHC</span><br><span class="line">    section CANN 10.x</span><br><span class="line">        标签v10.0.0 : Pipeline优化</span><br><span class="line">        标签v10.0.1 : 性能优化</span><br></pre></td></tr></table></figure>
+
+<h3 id="10-2-兼容性矩阵"><a href="#10-2-兼容性矩阵" class="headerlink" title="10.2 兼容性矩阵"></a>10.2 兼容性矩阵</h3><table>
+<thead>
+<tr>
+<th>HCCL版本</th>
+<th>CANN版本</th>
+<th>固件版本</th>
+<th>支持硬件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>v8.0.x</td>
+<td>8.0.x</td>
+<td>对应CANN</td>
+<td>Atlas 800&#x2F;900</td>
+</tr>
+<tr>
+<td>v9.0.x</td>
+<td>9.0.x</td>
+<td>对应CANN</td>
+<td>Atlas 800&#x2F;900</td>
+</tr>
+<tr>
+<td>v10.0.x</td>
+<td>10.0.x</td>
+<td>对应CANN</td>
+<td>Atlas 800&#x2F;900&#x2F;新硬件</td>
+</tr>
+</tbody></table>
+<h3 id="10-3-升级与回滚"><a href="#10-3-升级与回滚" class="headerlink" title="10.3 升级与回滚"></a>10.3 升级与回滚</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 安装自定义HCCL包</span></span><br><span class="line">./CANN-hccl_alg-&lt;version&gt;-linux.&lt;<span class="built_in">arch</span>&gt;.run</span><br><span class="line"></span><br><span class="line"><span class="comment"># 回滚到上一个版本</span></span><br><span class="line">./CANN-hccl_alg-&lt;version&gt;-linux.&lt;<span class="built_in">arch</span>&gt;.run --rollback</span><br></pre></td></tr></table></figure>
+
+<p><strong>注意：</strong> 回滚仅支持回退到上一次安装的版本状态。</p>
+<h2 id="11-扩展与定制开发"><a href="#11-扩展与定制开发" class="headerlink" title="11. 扩展与定制开发"></a>11. 扩展与定制开发</h2><h3 id="11-1-新算法集成流程"><a href="#11-1-新算法集成流程" class="headerlink" title="11.1 新算法集成流程"></a>11.1 新算法集成流程</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    Start[开始] --&gt; Design[算法设计]</span><br><span class="line">    Design --&gt; Implement[实现算法类]</span><br><span class="line">    </span><br><span class="line">    Implement --&gt; Interface[实现算法接口]</span><br><span class="line">    Interface --&gt; Resource[资源计算逻辑]</span><br><span class="line">    Resource --&gt; Schedule[任务编排逻辑]</span><br><span class="line">    </span><br><span class="line">    Schedule --&gt; Register[注册到框架]</span><br><span class="line">    Register --&gt; Selector[更新选择器规则]</span><br><span class="line">    </span><br><span class="line">    Selector --&gt; UnitTest[单元测试]</span><br><span class="line">    UnitTest --&gt; IntegTest[集成测试]</span><br><span class="line">    IntegTest --&gt; PerfTest[性能测试]</span><br><span class="line">    </span><br><span class="line">    PerfTest --&gt; Doc[文档编写]</span><br><span class="line">    Doc --&gt; End[完成]</span><br></pre></td></tr></table></figure>
+
+<h3 id="11-2-算法接口规范"><a href="#11-2-算法接口规范" class="headerlink" title="11.2 算法接口规范"></a>11.2 算法接口规范</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 伪代码示例</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">CollectiveAlgorithm</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="comment">// 初始化算法</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Status <span class="title">Init</span><span class="params">(<span class="type">const</span> AlgorithmConfig&amp; config)</span> </span>= <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 计算资源需求</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Status <span class="title">CalculateResource</span><span class="params">(ResourceInfo&amp; resource)</span> </span>= <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 生成任务编排</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Status <span class="title">GenerateTaskSchedule</span><span class="params">(TaskSchedule&amp; schedule)</span> </span>= <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 执行算法</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Status <span class="title">Execute</span><span class="params">(<span class="type">const</span> ExecuteContext&amp; context)</span> </span>= <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 清理资源</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Status <span class="title">Cleanup</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h3 id="11-3-贡献指南"><a href="#11-3-贡献指南" class="headerlink" title="11.3 贡献指南"></a>11.3 贡献指南</h3><ol>
+<li><strong>Issue讨论：</strong> 新特性需先通过Issue讨论方案</li>
+<li><strong>CLA签署：</strong> 首次贡献需签署CLA协议</li>
+<li><strong>代码规范：</strong> 遵循项目代码规范</li>
+<li><strong>测试覆盖：</strong> 提供完整的单元测试和集成测试</li>
+<li><strong>文档更新：</strong> 同步更新相关文档</li>
+<li><strong>PR模板：</strong> 按模板填写PR信息</li>
+</ol>
+<h2 id="12-参考资料"><a href="#12-参考资料" class="headerlink" title="12. 参考资料"></a>12. 参考资料</h2><h3 id="12-1-官方文档"><a href="#12-1-官方文档" class="headerlink" title="12.1 官方文档"></a>12.1 官方文档</h3><ul>
+<li><a target="_blank" rel="noopener" href="https://hiascend.com/document/redirect/CannCommunityHcclUg">集合通信用户指南</a></li>
+<li><a target="_blank" rel="noopener" href="https://cann-doc.obs.cn-north-4.myhuaweicloud.com/hccl/">集合通信源码定制开发指南</a></li>
+<li><a target="_blank" rel="noopener" href="https://hiascend.com/document/redirect/CannCommunityEnvRef">环境变量参考</a></li>
+<li><a target="_blank" rel="noopener" href="https://hiascend.com/document/redirect/CannCommunityToolHcclTest">HCCL性能测试工具用户指南</a></li>
+</ul>
+<h3 id="12-2-技术文章"><a href="#12-2-技术文章" class="headerlink" title="12.2 技术文章"></a>12.2 技术文章</h3><ul>
+<li><a target="_blank" rel="noopener" href="https://www.hiascend.com/zh/developer/techArticles/20240809-1">HCCL—昇腾高性能集合通信库简介</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.hiascend.com/zh/developer/techArticles/20240903-1">HCCL集合通信算法开发Hello World示例</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.hiascend.com/zh/developer/techArticles/20240930-1">HCCL集合通信常见问题定位思路</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.hiascend.com/zh/developer/techArticles/20241111-1">深度学习的分布式训练与集合通信（一）</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.hiascend.com/zh/developer/techArticles/20241122-1">深度学习的分布式训练与集合通信（二）</a></li>
+</ul>
+<h3 id="12-3-培训视频"><a href="#12-3-培训视频" class="headerlink" title="12.3 培训视频"></a>12.3 培训视频</h3><ul>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1MMmWYkEfS/">昇腾集合通信系列教程——什么是HCCL</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1YtUWYQEq2/">昇腾集合通信系列教程——常见集合通信原语</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1XEz5YeE3A/">昇腾集合通信系列教程——集合通信典型算法</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1w4sVeFEsB/">HCCL设计原理和实现系列</a></li>
+</ul>
+<h3 id="12-4-性能基准"><a href="#12-4-性能基准" class="headerlink" title="12.4 性能基准"></a>12.4 性能基准</h3><p><strong>典型场景性能（以AllReduce为例）：</strong></p>
+<table>
+<thead>
+<tr>
+<th>节点数</th>
+<th>数据量</th>
+<th>算法</th>
+<th>带宽利用率</th>
+<th>延迟</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>8 (单机)</td>
+<td>1GB</td>
+<td>Mesh</td>
+<td>&gt;95%</td>
+<td>&lt;1ms</td>
+</tr>
+<tr>
+<td>16 (2机)</td>
+<td>1GB</td>
+<td>Pipeline</td>
+<td>&gt;90%</td>
+<td>&lt;2ms</td>
+</tr>
+<tr>
+<td>64 (8机)</td>
+<td>1GB</td>
+<td>NHR</td>
+<td>&gt;85%</td>
+<td>&lt;5ms</td>
+</tr>
+<tr>
+<td>128 (16机)</td>
+<td>1GB</td>
+<td>NB</td>
+<td>&gt;80%</td>
+<td>&lt;10ms</td>
+</tr>
+</tbody></table>
+<h2 id="13-总结"><a href="#13-总结" class="headerlink" title="13. 总结"></a>13. 总结</h2><h3 id="13-1-核心优势"><a href="#13-1-核心优势" class="headerlink" title="13.1 核心优势"></a>13.1 核心优势</h3><ol>
+<li><strong>丰富的算法库</strong>：9种算法覆盖各种场景</li>
+<li><strong>智能算法选择</strong>：基于α-β模型的性能评估</li>
+<li><strong>层次化设计</strong>：清晰的三层架构</li>
+<li><strong>高性能实现</strong>：充分利用硬件特性</li>
+<li><strong>开放可扩展</strong>：支持自定义算法开发</li>
+</ol>
+<h3 id="13-2-应用场景"><a href="#13-2-应用场景" class="headerlink" title="13.2 应用场景"></a>13.2 应用场景</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">mindmap</span><br><span class="line">  root((HCCL应用))</span><br><span class="line">    深度学习</span><br><span class="line">      分布式训练</span><br><span class="line">      数据并行</span><br><span class="line">      模型并行</span><br><span class="line">      流水线并行</span><br><span class="line">    高性能计算</span><br><span class="line">      科学计算</span><br><span class="line">      大规模仿真</span><br><span class="line">      图计算</span><br><span class="line">    大数据</span><br><span class="line">      分布式处理</span><br><span class="line">      MapReduce</span><br><span class="line">      Spark集成</span><br></pre></td></tr></table></figure>
+
+<h3 id="13-3-未来展望"><a href="#13-3-未来展望" class="headerlink" title="13.3 未来展望"></a>13.3 未来展望</h3><ul>
+<li><strong>算法优化</strong>：持续优化现有算法性能</li>
+<li><strong>新算法引入</strong>：引入更多先进算法</li>
+<li><strong>智能调度</strong>：基于AI的算法选择</li>
+<li><strong>异构支持</strong>：支持更多硬件平台</li>
+<li><strong>生态建设</strong>：与更多框架深度集成</li>
+</ul>
+<hr>
+</article>
+<div class="article-footer">
+    <section id="license">
+      <div class="header"><span>许可协议</span></div>
+      <div class="body"><p>本文采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">署名-非商业性使用-相同方式共享 4.0 国际</a> 许可协议，转载请注明出处。</p>
+</div>
+    </section>
+    
+
+</div>
+
+<div class="related-wrap" id="read-next"><section class="body"><div class="item" id="prev"><div class="note">较新文章</div><a href="/2025/11/17/Megatron_DeepDive/">Megatron-LM 架构深度分析</a></div><div class="item" id="next"><div class="note">较早文章</div><a href="/2025/11/17/DeepEP_DeepDive/">DeepEP 架构分析</a></div></section></div>
+
+
+
+
+  <div class="related-wrap md-text" id="comments">
+    <section class='header cmt-title cap theme'>
+      <p>快来参与讨论吧~</p>
+
+    </section>
+    <section class='body cmt-body giscus'>
+      
+
+<svg class="loading" style="vertical-align:middle;fill:currentColor;overflow:hidden;" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2709"><path d="M832 512c0-176-144-320-320-320V128c211.2 0 384 172.8 384 384h-64zM192 512c0 176 144 320 320 320v64C300.8 896 128 723.2 128 512h64z" p-id="2710"></path></svg>
+
+<div id="giscus" src="https://giscus.app/client.js" data-repo="nash635/nash635.github.io" data-repo-id="R_kgDOKBdEtA" data-category="General" data-category-id="DIC_kwDOKBdEtM4CxbhU" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous"></div>
+
+    </section>
+  </div>
+
+
+
+<footer class="page-footer footnote"><hr><div class="text"><p>本站由 <a href="/">nash635</a> 使用 <a target="_blank" rel="noopener" href="https://github.com/xaoxuu/hexo-theme-stellar/tree/1.33.1">Stellar 1.33.1</a> 主题创建。<br>本博客所有文章除特别声明外，均采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可协议，转载请注明出处。</p>
+</div></footer>
+<div class="main-mask" onclick="sidebar.dismiss()"></div></div><aside class="l_right">
+<div class="widgets">
+
+
+
+<widget class="widget-wrapper toc" id="data-toc" collapse="false"><div class="widget-header dis-select"><span class="name">本文目录</span><a class="cap-action" onclick="sidebar.toggleTOC()" ><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6h11m-11 6h11m-11 6h11M4 6h1v4m-1 0h2m0 8H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></a></div><div class="widget-body"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#HCCL-Huawei-Collective-Communication-Library-%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3"><span class="toc-text">HCCL (Huawei Collective Communication Library) 设计文档</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E9%A1%B9%E7%9B%AE%E6%A6%82%E8%BF%B0"><span class="toc-text">1. 项目概述</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-1-%E9%A1%B9%E7%9B%AE%E7%AE%80%E4%BB%8B"><span class="toc-text">1.1 项目简介</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-2-%E6%A0%B8%E5%BF%83%E7%89%B9%E6%80%A7"><span class="toc-text">1.2 核心特性</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-3-%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84"><span class="toc-text">1.3 系统架构</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E6%A0%B8%E5%BF%83%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1"><span class="toc-text">2. 核心架构设计</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-1-%E4%B8%89%E5%B1%82%E6%9E%B6%E6%9E%84%E6%A8%A1%E5%9E%8B"><span class="toc-text">2.1 三层架构模型</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#2-1-1-%E9%80%82%E9%85%8D%E5%B1%82"><span class="toc-text">2.1.1 适配层</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-1-2-%E9%9B%86%E5%90%88%E9%80%9A%E4%BF%A1%E4%B8%9A%E5%8A%A1%E5%B1%82%EF%BC%88%E6%9C%AC%E4%BB%93%E6%A0%B8%E5%BF%83%EF%BC%89"><span class="toc-text">2.1.2 集合通信业务层（本仓核心）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-1-3-%E9%9B%86%E5%90%88%E9%80%9A%E4%BF%A1%E5%B9%B3%E5%8F%B0%E5%B1%82"><span class="toc-text">2.1.3 集合通信平台层</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-%E7%9B%AE%E5%BD%95%E7%BB%93%E6%9E%84"><span class="toc-text">2.2 目录结构</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E9%9B%86%E5%90%88%E9%80%9A%E4%BF%A1%E7%AE%97%E6%B3%95%E8%AF%A6%E8%A7%A3"><span class="toc-text">3. 集合通信算法详解</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-%E6%80%A7%E8%83%BD%E8%AF%84%E4%BC%B0%E6%A8%A1%E5%9E%8B"><span class="toc-text">3.1 性能评估模型</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-2-Mesh-%E7%AE%97%E6%B3%95"><span class="toc-text">3.2 Mesh 算法</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-2-1-%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-text">3.2.1 算法原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-2-2-%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B%E7%A4%BA%E4%BE%8B%EF%BC%88%E4%BB%A5AllReduce%E4%B8%BA%E4%BE%8B%EF%BC%89"><span class="toc-text">3.2.2 执行流程示例（以AllReduce为例）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-2-3-%E6%80%A7%E8%83%BD%E6%A8%A1%E5%9E%8B"><span class="toc-text">3.2.3 性能模型</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-3-Ring-%E7%AE%97%E6%B3%95"><span class="toc-text">3.3 Ring 算法</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-3-1-%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-text">3.3.1 算法原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-3-2-%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B%E7%A4%BA%E4%BE%8B%EF%BC%88%E4%BB%A5AllReduce%E4%B8%BA%E4%BE%8B%EF%BC%89"><span class="toc-text">3.3.2 执行流程示例（以AllReduce为例）</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#%E4%B8%A4%E9%98%B6%E6%AE%B5%E6%A6%82%E8%A7%88"><span class="toc-text">两阶段概览</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#%E8%AF%A6%E7%BB%86%E6%89%A7%E8%A1%8C%E6%AD%A5%E9%AA%A4%EF%BC%884%E8%8A%82%E7%82%B9%E7%A4%BA%E4%BE%8B%EF%BC%89"><span class="toc-text">详细执行步骤（4节点示例）</span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-3-3-%E6%80%A7%E8%83%BD%E6%A8%A1%E5%9E%8B"><span class="toc-text">3.3.3 性能模型</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-4-RHD-Recursive-Halving-Doubling-%E7%AE%97%E6%B3%95"><span class="toc-text">3.4 RHD (Recursive Halving-Doubling) 算法</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-4-1-%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-text">3.4.1 算法原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-4-2-%E9%80%9A%E4%BF%A1%E6%AD%A5%E9%AA%A4%E7%A4%BA%E4%BE%8B%EF%BC%88p-4%EF%BC%8C%E4%BB%A5AllReduce%E4%B8%BA%E4%BE%8B%EF%BC%89"><span class="toc-text">3.4.2 通信步骤示例（p&#x3D;4，以AllReduce为例）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-4-3-%E6%80%A7%E8%83%BD%E6%A8%A1%E5%9E%8B"><span class="toc-text">3.4.3 性能模型</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-5-PairWise-%E7%AE%97%E6%B3%95"><span class="toc-text">3.5 PairWise 算法</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-5-1-%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-text">3.5.1 算法原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-5-2-%E6%80%A7%E8%83%BD%E6%A8%A1%E5%9E%8B"><span class="toc-text">3.5.2 性能模型</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-6-Star-%E7%AE%97%E6%B3%95"><span class="toc-text">3.6 Star 算法</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-6-1-%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-text">3.6.1 算法原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-6-2-%E6%80%A7%E8%83%BD%E6%A8%A1%E5%9E%8B"><span class="toc-text">3.6.2 性能模型</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-7-NHR-Nonuniform-Hierarchical-Ring-%E7%AE%97%E6%B3%95"><span class="toc-text">3.7 NHR (Nonuniform Hierarchical Ring) 算法</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-7-1-%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-text">3.7.1 算法原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-7-2-%E6%80%A7%E8%83%BD%E6%A8%A1%E5%9E%8B"><span class="toc-text">3.7.2 性能模型</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-8-NB-Nonuniform-Bruck-%E7%AE%97%E6%B3%95"><span class="toc-text">3.8 NB (Nonuniform Bruck) 算法</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-8-1-%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-text">3.8.1 算法原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-8-2-%E6%80%A7%E8%83%BD%E6%A8%A1%E5%9E%8B"><span class="toc-text">3.8.2 性能模型</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-9-AHC-Asymmetric-Hierarchical-Concatenate-%E7%AE%97%E6%B3%95"><span class="toc-text">3.9 AHC (Asymmetric Hierarchical Concatenate) 算法</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-9-1-%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-text">3.9.1 算法原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-9-2-%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B%E7%A4%BA%E4%BE%8B%EF%BC%88%E4%BB%A5AllReduce%E4%B8%BA%E4%BE%8B%EF%BC%89"><span class="toc-text">3.9.2 执行流程示例（以AllReduce为例）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-9-3-%E6%80%A7%E8%83%BD%E6%A8%A1%E5%9E%8B"><span class="toc-text">3.9.3 性能模型</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-10-Pipeline-%E7%AE%97%E6%B3%95"><span class="toc-text">3.10 Pipeline 算法</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-10-1-%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86"><span class="toc-text">3.10.1 算法原理</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-10-2-%E6%B5%81%E6%B0%B4%E7%BA%BF%E6%89%A7%E8%A1%8C%E7%A4%BA%E4%BE%8B%EF%BC%88%E4%BB%A5AllGather%E4%B8%BA%E4%BE%8B%EF%BC%89"><span class="toc-text">3.10.2 流水线执行示例（以AllGather为例）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-10-3-%E6%80%A7%E8%83%BD%E6%A8%A1%E5%9E%8B"><span class="toc-text">3.10.3 性能模型</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-11-%E7%AE%97%E6%B3%95%E9%80%89%E6%8B%A9%E7%AD%96%E7%95%A5"><span class="toc-text">3.11 算法选择策略</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E9%9B%86%E5%90%88%E9%80%9A%E4%BF%A1%E5%8E%9F%E8%AF%AD"><span class="toc-text">4. 集合通信原语</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-%E6%A0%B8%E5%BF%83%E5%8E%9F%E8%AF%AD%E5%88%97%E8%A1%A8"><span class="toc-text">4.1 核心原语列表</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-%E5%8E%9F%E8%AF%AD%E8%AF%AD%E4%B9%89%E8%AF%B4%E6%98%8E"><span class="toc-text">4.2 原语语义说明</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E9%80%9A%E4%BF%A1%E6%A1%86%E6%9E%B6%E8%AE%BE%E8%AE%A1"><span class="toc-text">5. 通信框架设计</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-%E9%80%9A%E4%BF%A1%E5%9F%9F%E7%AE%A1%E7%90%86"><span class="toc-text">5.1 通信域管理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-%E7%AE%97%E5%AD%90%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B"><span class="toc-text">5.2 算子执行流程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-3-%E7%AE%97%E6%B3%95%E9%80%89%E6%8B%A9%E5%99%A8%E8%AE%BE%E8%AE%A1"><span class="toc-text">5.3 算法选择器设计</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E7%BC%96%E8%AF%91%E4%B8%8E%E6%9E%84%E5%BB%BA%E7%B3%BB%E7%BB%9F"><span class="toc-text">6. 编译与构建系统</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#6-1-%E7%BC%96%E8%AF%91%E6%B5%81%E7%A8%8B"><span class="toc-text">6.1 编译流程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-2-%E4%B8%BB%E8%A6%81%E7%BC%96%E8%AF%91%E9%80%89%E9%A1%B9"><span class="toc-text">6.2 主要编译选项</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-3-%E4%BE%9D%E8%B5%96%E5%85%B3%E7%B3%BB"><span class="toc-text">6.3 依赖关系</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-%E6%B5%8B%E8%AF%95%E4%B8%8E%E9%AA%8C%E8%AF%81"><span class="toc-text">7. 测试与验证</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#7-1-%E6%B5%8B%E8%AF%95%E5%88%86%E5%B1%82%E6%9E%B6%E6%9E%84"><span class="toc-text">7.1 测试分层架构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-2-HCCL-Test-%E5%B7%A5%E5%85%B7"><span class="toc-text">7.2 HCCL Test 工具</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-3-LLT%E6%B5%8B%E8%AF%95%E5%91%BD%E4%BB%A4"><span class="toc-text">7.3 LLT测试命令</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E7%AD%96%E7%95%A5"><span class="toc-text">8. 性能优化策略</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#8-1-%E7%AE%97%E6%B3%95%E7%BA%A7%E4%BC%98%E5%8C%96"><span class="toc-text">8.1 算法级优化</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-2-%E5%85%B3%E9%94%AE%E6%80%A7%E8%83%BD%E6%8C%87%E6%A0%87"><span class="toc-text">8.2 关键性能指标</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-3-%E6%80%A7%E8%83%BD%E8%B0%83%E4%BC%98%E5%8F%82%E6%95%B0"><span class="toc-text">8.3 性能调优参数</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#9-%E5%AE%89%E5%85%A8%E4%B8%8E%E5%8F%AF%E9%9D%A0%E6%80%A7"><span class="toc-text">9. 安全与可靠性</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#9-1-%E5%AE%89%E5%85%A8%E6%8E%AA%E6%96%BD"><span class="toc-text">9.1 安全措施</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-2-%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6"><span class="toc-text">9.2 错误处理机制</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-3-%E6%97%A5%E5%BF%97%E4%B8%8E%E8%B0%83%E8%AF%95"><span class="toc-text">9.3 日志与调试</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#10-%E7%89%88%E6%9C%AC%E7%AE%A1%E7%90%86%E4%B8%8E%E5%85%BC%E5%AE%B9%E6%80%A7"><span class="toc-text">10. 版本管理与兼容性</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#10-1-%E7%89%88%E6%9C%AC%E7%AD%96%E7%95%A5"><span class="toc-text">10.1 版本策略</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-2-%E5%85%BC%E5%AE%B9%E6%80%A7%E7%9F%A9%E9%98%B5"><span class="toc-text">10.2 兼容性矩阵</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-3-%E5%8D%87%E7%BA%A7%E4%B8%8E%E5%9B%9E%E6%BB%9A"><span class="toc-text">10.3 升级与回滚</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#11-%E6%89%A9%E5%B1%95%E4%B8%8E%E5%AE%9A%E5%88%B6%E5%BC%80%E5%8F%91"><span class="toc-text">11. 扩展与定制开发</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#11-1-%E6%96%B0%E7%AE%97%E6%B3%95%E9%9B%86%E6%88%90%E6%B5%81%E7%A8%8B"><span class="toc-text">11.1 新算法集成流程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-2-%E7%AE%97%E6%B3%95%E6%8E%A5%E5%8F%A3%E8%A7%84%E8%8C%83"><span class="toc-text">11.2 算法接口规范</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-3-%E8%B4%A1%E7%8C%AE%E6%8C%87%E5%8D%97"><span class="toc-text">11.3 贡献指南</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#12-%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="toc-text">12. 参考资料</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#12-1-%E5%AE%98%E6%96%B9%E6%96%87%E6%A1%A3"><span class="toc-text">12.1 官方文档</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#12-2-%E6%8A%80%E6%9C%AF%E6%96%87%E7%AB%A0"><span class="toc-text">12.2 技术文章</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#12-3-%E5%9F%B9%E8%AE%AD%E8%A7%86%E9%A2%91"><span class="toc-text">12.3 培训视频</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#12-4-%E6%80%A7%E8%83%BD%E5%9F%BA%E5%87%86"><span class="toc-text">12.4 性能基准</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#13-%E6%80%BB%E7%BB%93"><span class="toc-text">13. 总结</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#13-1-%E6%A0%B8%E5%BF%83%E4%BC%98%E5%8A%BF"><span class="toc-text">13.1 核心优势</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#13-2-%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF"><span class="toc-text">13.2 应用场景</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#13-3-%E6%9C%AA%E6%9D%A5%E5%B1%95%E6%9C%9B"><span class="toc-text">13.3 未来展望</span></a></li></ol></li></ol></li></ol></div><div class="widget-footer"><a class="top" onclick="util.scrollTop()"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path stroke-linejoin="round" d="m9 15.5l3-3l3 3m-6-4l3-3l3 3"/><path d="M7 3.338A9.95 9.95 0 0 1 12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12c0-1.821.487-3.53 1.338-5"/></g></svg><span>回到顶部</span></a><a class="buttom" onclick="util.scrollComment()"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M8 10.5h8M8 14h5.5M17 3.338A9.95 9.95 0 0 0 12 2C6.477 2 2 6.477 2 12c0 1.6.376 3.112 1.043 4.453c.178.356.237.763.134 1.148l-.595 2.226a1.3 1.3 0 0 0 1.591 1.592l2.226-.596a1.63 1.63 0 0 1 1.149.133A9.96 9.96 0 0 0 12 22c5.523 0 10-4.477 10-10c0-1.821-.487-3.53-1.338-5"/></svg><span>参与讨论</span></a></div></widget>
+</div></aside><div class='float-panel'>
+  <button type='button' style='display:none' class='laptop-only rightbar-toggle mobile' onclick='sidebar.rightbar()'>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6h11m-11 6h11m-11 6h11M4 6h1v4m-1 0h2m0 8H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+  </button>
+  <button type='button' style='display:none' class='mobile-only leftbar-toggle mobile' onclick='sidebar.leftbar()'>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 11c0-3.771 0-5.657 1.172-6.828C4.343 3 6.229 3 10 3h4c3.771 0 5.657 0 6.828 1.172C22 5.343 22 7.229 22 11v2c0 3.771 0 5.657-1.172 6.828C19.657 21 17.771 21 14 21h-4c-3.771 0-5.657 0-6.828-1.172C2 18.657 2 16.771 2 13z"/><path id="sep" stroke-linecap="round" d="M5.5 10h6m-5 4h4m4.5 7V3"/></g></svg>
+  </button>
+</div>
+</div><div class="scripts">
+
+
+<script type="text/javascript">
+  window.canonical = {"originalHost":null,"officialHosts":["localhost"],"encoded":""};
+  const ctx = {
+    date_suffix: {
+      just: `刚刚`,
+      min: `分钟前`,
+      hour: `小时前`,
+      day: `天前`,
+    },
+    root : `/`,
+    tag_plugins: {
+      chat: Object.assign({"api":"https://siteinfo.listentothewind.cn/api/v1"}),
+    }
+  };
+
+  // required plugins (only load if needs)
+  if (`local_search`) {
+    ctx.search = {};
+    ctx.search.service = `local_search`;
+    if (ctx.search.service == 'local_search') {
+      let service_obj = Object.assign({}, `{"field":"all","path":"/search.json","content":true,"skip_search":null,"sort":"-date"}`);
+      ctx.search[ctx.search.service] = service_obj;
+    }
+  }
+  const def = {
+    avatar: `https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/avatar/round/3442075.svg`,
+    cover: `https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/cover/76b86c0226ffd.svg`,
+    loading: `https://api.iconify.design/eos-icons:three-dots-loading.svg?color=%231cd0fd`,
+  };
+  const deps = {
+    jquery: `https://gcore.jsdelivr.net/npm/jquery@3.7/dist/jquery.min.js`,
+    marked: `https://gcore.jsdelivr.net/npm/marked@13.0/lib/marked.umd.min.js`,
+    lazyload: `/%5Bobject%20Object%5D`
+  }
+  
+
+</script>
+
+<script type="text/javascript">
+  
+  function RunItem() {
+    this.list = []; // 存放回调函数
+    this.start = () => {
+      for (var i = 0; i < this.list.length; i++) {
+        this.list[i].run();
+      }
+    };
+    this.push = (fn, name, setRequestAnimationFrame = true) => {
+      let myfn = fn
+      if (setRequestAnimationFrame) {
+        myfn = () => {
+          utils.requestAnimationFrame(fn)
+        }
+      }
+      var f = new Item(myfn, name);
+      this.list.push(f);
+    };
+    this.remove = (name) => {
+      for (let index = 0; index < this.list.length; index++) {
+        const e = this.list[index];
+        if (e.name == name) {
+          this.list.splice(index, 1);
+        }
+      }
+    }
+    // 构造一个可以run的对象
+    function Item(fn, name) {
+      // 函数名称
+      this.name = name || fn.name;
+      // run方法
+      this.run = () => {
+        try {
+          fn()
+        } catch (error) {
+          console.log(error);
+        }
+      };
+    }
+  }
+
+  const utils = {
+    // 懒加载 css https://github.com/filamentgroup/loadCSS
+    css: (href, before, media, attributes) => {
+      var doc = window.document;
+      var ss = doc.createElement("link");
+      var ref;
+      if (before) {
+        ref = before;
+      } else {
+        var refs = (doc.body || doc.getElementsByTagName("head")[0]).childNodes;
+        ref = refs[refs.length - 1];
+      }
+      var sheets = doc.styleSheets;
+      if (attributes) {
+        for (var attributeName in attributes) {
+          if (attributes.hasOwnProperty(attributeName)) {
+            ss.setAttribute(attributeName, attributes[attributeName]);
+          }
+        }
+      }
+      ss.rel = "stylesheet";
+      ss.href = href;
+      ss.media = "only x";
+      function ready(cb) {
+        if (doc.body) {
+          return cb();
+        }
+        setTimeout(function () {
+          ready(cb);
+        });
+      }
+      ready(function () {
+        ref.parentNode.insertBefore(ss, before ? ref : ref.nextSibling);
+      });
+      var onloadcssdefined = function (cb) {
+        var resolvedHref = ss.href;
+        var i = sheets.length;
+        while (i--) {
+          if (sheets[i].href === resolvedHref) {
+            return cb();
+          }
+        }
+        setTimeout(function () {
+          onloadcssdefined(cb);
+        });
+      };
+      function loadCB() {
+        if (ss.addEventListener) {
+          ss.removeEventListener("load", loadCB);
+        }
+        ss.media = media || "all";
+      }
+      if (ss.addEventListener) {
+        ss.addEventListener("load", loadCB);
+      }
+      ss.onloadcssdefined = onloadcssdefined;
+      onloadcssdefined(loadCB);
+      return ss;
+    },
+
+    js: (src, opt) => new Promise((resolve, reject) => {
+      var script = document.createElement('script');
+      if (src.startsWith('/')) {
+        src = ctx.root + src.substring(1);
+      }
+      script.src = src;
+      if (opt) {
+        for (let key of Object.keys(opt)) {
+          script[key] = opt[key]
+        }
+      } else {
+        // 默认异步，如果需要同步，第二个参数传入 {} 即可
+        script.async = true
+      }
+      script.onerror = reject
+      script.onload = script.onreadystatechange = function () {
+        const loadState = this.readyState
+        if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+        script.onload = script.onreadystatechange = null
+        resolve()
+      }
+      document.head.appendChild(script)
+    }),
+
+    jq: (fn) => {
+      if (typeof jQuery === 'undefined') {
+        utils.js(deps.jquery).then(fn)
+      } else {
+        fn()
+      }
+    },
+
+    onLoading: (el) => {
+      if (el) {
+        $(el).append('<div class="loading-wrap"><svg xmlns="http://www.w3.org/2000/svg" width="2em" height="2em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"><path stroke-dasharray="60" stroke-dashoffset="60" stroke-opacity=".3" d="M12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="1.3s" values="60;0"/></path><path stroke-dasharray="15" stroke-dashoffset="15" d="M12 3C16.9706 3 21 7.02944 21 12"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.3s" values="15;0"/><animateTransform attributeName="transform" dur="1.5s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/></path></g></svg></div>');
+      }
+    },
+    onLoadSuccess: (el) => {
+      if (el) {
+        $(el).find('.loading-wrap').remove();
+      }
+    },
+    onLoadFailure: (el) => {
+      if (el) {
+        $(el).find('.loading-wrap svg').remove();
+        $(el).find('.loading-wrap').append('<svg xmlns="http://www.w3.org/2000/svg" width="2em" height="2em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path stroke-dasharray="60" stroke-dashoffset="60" d="M12 3L21 20H3L12 3Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.5s" values="60;0"/></path><path stroke-dasharray="6" stroke-dashoffset="6" d="M12 10V14"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="6;0"/></path></g><circle cx="12" cy="17" r="1" fill="currentColor" fill-opacity="0"><animate fill="freeze" attributeName="fill-opacity" begin="0.8s" dur="0.4s" values="0;1"/></circle></svg>');
+        $(el).find('.loading-wrap').addClass('error');
+      }
+    },
+    request: (el, url, callback, onFailure) => {
+      const maxRetry = 3;
+      let retryCount = 0;
+
+      return new Promise((resolve, reject) => {
+        const load = () => {
+          utils.onLoading?.(el);
+
+          let timedOut = false;
+          const timeout = setTimeout(() => {
+            timedOut = true;
+            console.warn('[request] 超时:', url);
+
+            if (++retryCount >= maxRetry) {
+              utils.onLoadFailure?.(el);
+              onFailure?.();
+              reject('请求超时');
+            } else {
+              setTimeout(load, 1000);
+            }
+          }, 5000);
+
+          fetch(url).then(resp => {
+            if (timedOut) return;
+            clearTimeout(timeout);
+
+            if (!resp.ok) throw new Error('响应失败');
+            return resp;
+          }).then(data => {
+            if (timedOut) return;
+            utils.onLoadSuccess?.(el);
+            callback(data);
+            resolve(data);
+          }).catch(err => {
+            clearTimeout(timeout);
+            console.warn('[request] 错误:', err);
+
+            if (++retryCount >= maxRetry) {
+              utils.onLoadFailure?.(el);
+              onFailure?.();
+              reject(err);
+            } else {
+              setTimeout(load, 1000);
+            }
+          });
+        };
+
+        load();
+      });
+    },
+    requestWithoutLoading: (url, options = {}, maxRetry = 2, timeout = 5000) => {
+      return new Promise((resolve, reject) => {
+        let retryCount = 0;
+
+        const tryRequest = () => {
+          let timedOut = false;
+          const timer = setTimeout(() => {
+            timedOut = true;
+            if (++retryCount > maxRetry) reject('timeout');
+            else tryRequest();
+          }, timeout);
+
+          fetch(url, options)
+            .then(resp => {
+              clearTimeout(timer);
+              if (!resp.ok) throw new Error('bad response');
+              resolve(resp);
+            })
+            .catch(err => {
+              clearTimeout(timer);
+              if (++retryCount > maxRetry) reject(err);
+              else setTimeout(tryRequest, 500);
+            });
+        };
+
+        tryRequest();
+      });
+    },
+    /********************** requestAnimationFrame ********************************/
+    // 1、requestAnimationFrame 会把每一帧中的所有 DOM 操作集中起来，在一次重绘或回流中就完成，并且重绘或回流的时间间隔紧紧跟随浏览器的刷新频率，一般来说，这个频率为每秒60帧。
+    // 2、在隐藏或不可见的元素中，requestAnimationFrame 将不会进行重绘或回流，这当然就意味着更少的的 cpu，gpu 和内存使用量。
+    requestAnimationFrame: (fn) => {
+      if (!window.requestAnimationFrame) {
+        window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
+      }
+      window.requestAnimationFrame(fn)
+    },
+    dark: {},
+  };
+
+  // utils.dark.mode 当前模式 dark or light
+  // utils.dark.toggle() 暗黑模式触发器
+  // utils.dark.push(callBack[,"callBackName"]) 传入触发器回调函数
+  utils.dark.method = {
+    toggle: new RunItem(),
+  };
+  utils.dark = Object.assign(utils.dark, {
+    push: utils.dark.method.toggle.push,
+  });
+</script>
+<script>
+  const sidebar = {
+    leftbar: () => {
+      if (l_body) {
+        l_body.toggleAttribute('leftbar');
+        l_body.removeAttribute('rightbar');
+      }
+    },
+    rightbar: () => {
+      if (l_body) {
+        l_body.toggleAttribute('rightbar');
+        l_body.removeAttribute('leftbar');
+      }
+    },
+    dismiss: () => {
+      if (l_body) {
+        l_body.removeAttribute('leftbar');
+        l_body.removeAttribute('rightbar');
+      }
+    },
+    toggleTOC: () => {
+      document.querySelector('#data-toc').classList.toggle('collapse');
+    }
+  }
+</script>
+<script type="text/javascript">
+  (() => {
+    const tagSwitchers = document.querySelectorAll('.tag-subtree.parent-tag > a > .tag-switcher-wrapper')
+    for (const tagSwitcher of tagSwitchers) {
+      tagSwitcher.addEventListener('click', (e) => {
+        const parent = e.target.closest('.tag-subtree.parent-tag')
+        parent.classList.toggle('expanded')
+        e.preventDefault()
+      })
+    }
+
+    // Get active tag from query string, then activate it.
+    const urlParams = new URLSearchParams(window.location.search)
+    const activeTag = urlParams.get('tag')
+    if (activeTag) {
+      let tag = document.querySelector(`.tag-subtree[data-tag="${activeTag}"]`)
+      if (tag) {
+        tag.querySelector('a').classList.add('active')
+        
+        while (tag) {
+          tag.classList.add('expanded')
+          tag = tag.parentElement.closest('.tag-subtree.parent-tag')
+        }
+      }
+    }
+  })()
+</script>
+
+<script async src="https://gcore.jsdelivr.net/npm/vanilla-lazyload@19.1/dist/lazyload.min.js"></script>
+<script>
+  // https://www.npmjs.com/package/vanilla-lazyload
+  // Set the options globally
+  // to make LazyLoad self-initialize
+  window.lazyLoadOptions = {
+    elements_selector: ".lazy",
+    callback_loaded: (el) => {
+      el.classList.add('loaded');
+      const wrapper = el.closest('.lazy-box');
+      const icon = wrapper?.querySelector('.lazy-icon');
+      if (icon) icon.remove();
+    }
+  };
+  // Listen to the initialization event
+  // and get the instance of LazyLoad
+  window.addEventListener(
+    "LazyLoad::Initialized",
+    function (event) {
+      window.lazyLoadInstance = event.detail.instance;
+    },
+    false
+  );
+  document.addEventListener('DOMContentLoaded', function () {
+    window.lazyLoadInstance?.update();
+  });
+
+  window.wrapLazyloadImages = (container) => {
+    if (typeof container === 'string') {
+      container = document.querySelector(container);
+    }
+    if (!container) return;
+    
+    const images = container.querySelectorAll('img');
+    images.forEach((img) => {
+      if (img.classList.contains('lazy')) return;
+
+      const src = img.getAttribute('src');
+      if (!src) return;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'lazy-box';
+
+      const newImg = img.cloneNode();
+      newImg.removeAttribute('src');
+      newImg.setAttribute('data-src', src);
+      newImg.classList.add('lazy');
+
+      const icon = document.createElement('div');
+      icon.className = 'lazy-icon';
+      if (def.loading) {
+        icon.style.backgroundImage = `url("${def.loading}")`;
+      }
+
+      wrapper.appendChild(newImg);
+      wrapper.appendChild(icon);
+
+      img.replaceWith(wrapper);
+    });
+
+    // 通知 LazyLoad 更新
+    if (window.lazyLoadInstance?.update) {
+      window.lazyLoadInstance.update();
+    }
+  }
+  
+</script>
+
+<!-- required -->
+<script src="/js/main.js?v=1.33.1" defer></script>
+
+<script type="text/javascript">
+  const applyTheme = (theme) => {
+    if (theme === 'auto') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', theme)
+    }
+
+    // applyThemeToGiscus(theme)
+  }
+
+  // FIXME: 这会导致无法使用 preferred_color_scheme 以外的主题
+  const applyThemeToGiscus = (theme) => {
+    // theme = theme === 'auto' ? 'preferred_color_scheme' : theme
+    const cmt = document.getElementById('giscus')
+    if (cmt) {
+      // This works before giscus load.
+      cmt.setAttribute('data-theme', theme)
+    }
+
+    const iframe = document.querySelector('#comments > section.giscus > iframe')
+    if (iframe) {
+      // This works after giscus loaded.
+      const src = iframe.src
+      const newSrc = src.replace(/theme=[\w]+/, `theme=${theme}`)
+      iframe.src = newSrc
+    }
+  }
+
+  const switchTheme = () => {
+    // light -> dark -> auto -> light -> ...
+    const currentTheme = document.documentElement.getAttribute('data-theme')
+    let newTheme;
+    switch (currentTheme) {
+      case 'light':
+        newTheme = 'dark'
+        break
+      case 'dark':
+        newTheme = 'auto'
+        break
+      default:
+        newTheme = 'light'
+    }
+    applyTheme(newTheme)
+    window.localStorage.setItem('Stellar.theme', newTheme)
+    utils.dark.mode = newTheme === 'auto' ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : newTheme;
+    utils.dark.method.toggle.start();
+
+    const messages = {
+      light: `切换到浅色模式`,
+      dark: `切换到深色模式`,
+      auto: `切换到跟随系统配色`,
+    }
+    hud?.toast?.(messages[newTheme])
+  }
+
+  (() => {
+    // Apply user's preferred theme, if any.
+    const theme = window.localStorage.getItem('Stellar.theme')
+    if (theme !== null) {
+      applyTheme(theme)
+    } else {
+      utils.dark.mode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    utils.dark.method.toggle.start();
+  })()
+</script>
+
+
+<!-- optional -->
+
+  <script type="module">
+  const el = document.querySelector('#comments #giscus');
+  util.viewportLazyload(el, load_discus, false);
+
+  function load_discus() {
+    if (!el) return;
+    try {
+        el.innerHTML = '';
+      } catch (error) {
+        console.error(error);
+      }
+      const script = document.createElement('script');
+      script.async = true;
+      for (const key of Object.keys(el.attributes)) {
+        const attr = el.attributes[key];
+        if (['class', 'id'].includes(attr.name) === false) {
+          script.setAttribute(attr.name, attr.value);
+        }
+      }
+      el.appendChild(script);
+  }
+</script>
+
+
+
+
+<script defer>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    ctx.services = Object.assign({}, JSON.parse(`{"mdrender":{"js":"/js/services/mdrender.js"},"siteinfo":{"js":"/js/services/siteinfo.js","api":null},"ghinfo":{"js":"/js/services/ghinfo.js"},"rating":{"js":"/js/services/rating.js","api":"https://star-vote.xaox.cc/api/rating"},"vote":{"js":"/js/services/vote.js","api":"https://star-vote.xaox.cc/api/vote"},"sites":{"js":"/js/services/sites.js"},"friends":{"js":"/js/services/friends.js"},"friends_and_posts":{"js":"/js/services/friends_and_posts.js"},"timeline":{"js":"/js/services/timeline.js"},"fcircle":{"js":"/js/services/fcircle.js"},"weibo":{"js":"/js/services/weibo.js"},"memos":{"js":"/js/services/memos.js"},"voice":{"js":"/js/plugins/voice.js"},"video":{"js":"/js/plugins/video.js"},"download-file":{"js":"/js/plugins/download-file.js"},"twikoo":{"js":"/js/services/twikoo_latest_comment.js"},"waline":{"js":"/js/services/waline_latest_comment.js"},"artalk":{"js":"/js/services/artalk_latest_comment.js"},"giscus":{"js":"/js/services/giscus_latest_comment.js"},"contributors":{"edit_this_page":{"_posts/":null,"wiki/stellar/":"https://github.com/xaoxuu/hexo-theme-stellar-docs/blob/main/"},"js":"/js/services/contributors.js"}}`));
+    for (let id of Object.keys(ctx.services)) {
+      const js = ctx.services[id].js;
+      if (id == 'siteinfo') {
+        ctx.cardlinks = document.querySelectorAll('a.link-card[cardlink]');
+        if (ctx.cardlinks?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            setCardLink(ctx.cardlinks);
+          });
+        }
+      } else if (id == 'voice') {
+        ctx.voiceAudios = document.querySelectorAll('.voice>audio');
+        if (ctx.voiceAudios?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            createVoiceDom(ctx.voiceAudios);
+          });
+        }
+      } else if (id == 'video') {
+        ctx.videos = document.querySelectorAll('.video>video');
+        if (ctx.videos?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            videoEvents(ctx.videos);
+          });
+        }
+      } else if (id == 'download-file') {
+        ctx.files = document.querySelectorAll('.file');
+        if (ctx.files?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            downloadFileEvent(ctx.files);
+          });
+        }
+      } else {
+        const els = document.getElementsByClassName(`ds-${id}`);
+        if (els?.length > 0) {
+          utils.jq(() => {
+            if (id == 'timeline' || 'memos' || 'marked') {
+              utils.js(deps.marked).then(function () {
+                utils.js(js, { defer: true });
+              });
+            } else {
+              utils.js(js, { defer: true });
+            }
+          });
+        }
+      }
+    }
+
+    // chat iphone time
+    let phoneTimes = document.querySelectorAll('.chat .status-bar .time');
+
+    if (phoneTimes.length > 0) {
+      NowTime();
+      var date = new Date();
+      var sec = date.getSeconds();
+      var firstAdjustInterval = setInterval(firstAdjustTime, 1000 * (60 - sec));
+    }
+
+    function firstAdjustTime() {
+      NowTime();
+      clearInterval(firstAdjustInterval);
+      setInterval(NowTime, 1000 * 60);
+    }
+
+    function NowTime() {
+      for (let i = 0; i < phoneTimes.length; ++i) {
+        var timeSpan = phoneTimes[i];
+        var date = new Date();
+        var hour = date.getHours();
+        var min = date.getMinutes();
+        timeSpan.innerHTML = check(hour) + ":" + check(min);
+      }
+    };
+
+    function check(val) {
+      if (val < 10) {
+        return ("0" + val);
+      }
+      return (val);
+    }
+
+    // chat quote
+    const chat_quote_obverser = new IntersectionObserver((entries, observer) => {
+      entries.filter((entry) => { return entry.isIntersecting }).sort((a, b) => a.intersectionRect.y !== b.intersectionRect.y ? a.intersectionRect.y - b.intersectionRect.y : a.intersectionRect.x - b.intersectionRect.x).forEach((entry, index) => {
+          observer.unobserve(entry.target);
+          setTimeout(() => {
+            entry.target.classList.add('quote-blink');
+            setTimeout(() => {
+              entry.target.classList.remove('quote-blink');
+            }, 1000);
+          }, Math.max(100, 16) * (index + 1));
+        });
+    });
+
+    var chatQuotes = document.querySelectorAll(".chat .talk .quote");
+    chatQuotes.forEach((quote) => {
+      quote.addEventListener('click', function () {
+        var chatCellDom = document.getElementById("quote-" + quote.getAttribute("quotedCellTag"));
+        if (chatCellDom) {
+          var chatDiv = chatCellDom.parentElement;
+          var mid = chatDiv.clientHeight / 2;
+          var offsetTop = chatCellDom.offsetTop;
+          if (offsetTop > mid - chatCellDom.clientHeight / 2) {
+            chatDiv.scrollTo({
+              top: chatCellDom.offsetTop - mid + chatCellDom.clientHeight / 2,
+              behavior: "smooth"
+            });
+          } else {
+            chatDiv.scrollTo({
+              top: 0,
+              behavior: "smooth"
+            });
+          }
+          chat_quote_obverser.observe(chatCellDom);
+        }
+      });
+    });
+  });
+</script>
+
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    ctx.search = {
+      path: `/search.json`,
+    }
+    utils.js('/js/search/local-search.js', { defer: true });
+  });
+</script><script>
+  window.FPConfig = {
+    delay: 0,
+    ignoreKeywords: [],
+    maxRPS: 5,
+    hoverDelay: 25
+  };
+</script>
+<script defer src="https://gcore.jsdelivr.net/npm/flying-pages@2/flying-pages.min.js"></script><script>
+  ctx.fancybox = {
+    selector: `.timenode p>img`,
+    css: `https://gcore.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css`,
+    js: `https://gcore.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js`
+  };
+  var selector = '[data-fancybox]:not(.error), .with-fancybox .atk-content img:not([atk-emoticon])';
+  if (ctx.fancybox.selector) {
+    selector += `, ${ctx.fancybox.selector}`
+  }
+  var needFancybox = document.querySelectorAll(selector).length !== 0;
+  if (!needFancybox) {
+    const memos = document.getElementsByClassName('ds-memos');
+    if (memos != undefined && memos.length > 0) {
+      needFancybox = true;
+    }
+    const fancybox = document.getElementsByClassName('with-fancybox');
+    if (fancybox != undefined && fancybox.length > 0) {
+      needFancybox = true;
+    }
+  }
+  if (needFancybox) {
+    utils.css(ctx.fancybox.css);
+    utils.js(ctx.fancybox.js, { defer: true }).then(function () {
+      Fancybox.bind(selector, {
+        hideScrollbar: false,
+        Thumbs: {
+          autoStart: false,
+        },
+        caption: (fancybox, slide) => {
+          return slide.triggerEl.alt || slide.triggerEl.dataset.caption || null
+        }
+      });
+    })
+  }
+</script>
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    const swiper_api = document.getElementById('swiper-api');
+    if (swiper_api != undefined) {
+      utils.css(`https://unpkg.com/swiper@10.3/swiper-bundle.min.css`);
+      utils.js(`https://unpkg.com/swiper@10.3/swiper-bundle.min.js`, { defer: true }).then(function () {
+        const effect = swiper_api.getAttribute('effect') || '';
+        var swiper = new Swiper('.swiper#swiper-api', {
+          slidesPerView: 'auto',
+          spaceBetween: 8,
+          centeredSlides: true,
+          effect: effect,
+          rewind: true,
+          pagination: {
+            el: '.swiper-pagination',
+            clickable: true,
+          },
+          navigation: {
+            nextEl: '.swiper-button-next',
+            prevEl: '.swiper-button-prev',
+          },
+        });
+      })
+    }
+  });
+</script>
+
+<script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.6/MathJax.js?config=TeX-AMS-MML_HTMLorMML" async></script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+  MathJax.Hub.Config({
+    tex2jax: {
+      skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    }
+  });
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    window.codeElements = document.querySelectorAll('.code');
+    if (window.codeElements.length > 0) {
+      ctx.copycode = {
+        default_text: `Copy`,
+        success_text: `Copied`,
+        toast: `复制成功`,
+      };
+      utils.js('/js/plugins/copycode.js');
+    }
+  });
+</script>
+
+
+<!-- inject -->
+
+</div></body></html>

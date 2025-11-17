@@ -1,0 +1,1232 @@
+
+<!DOCTYPE html><html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="hexo-theme" content="https://github.com/xaoxuu/hexo-theme-stellar/tree/1.33.1" theme-name="Stellar" theme-version="1.33.1">
+  
+  
+  <meta name="generator" content="Hexo 7.3.0">
+  <meta http-equiv='x-dns-prefetch-control' content='on' />
+  
+  <meta name="renderer" content="webkit">
+  <meta name="force-rendering" content="webkit">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+  <meta name="HandheldFriendly" content="True" >
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000">
+  <meta name="theme-color" content="#f9fafb">
+  <title>Transformer Engine 架构设计分析 - My Blog</title>
+
+  
+    <meta name="description" content="Transformer Engine是NVIDIA开发的高性能Transformer模型加速库，支持FP8混合精度训练，显著降低内存占用和提升性能。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Transformer Engine 架构设计分析">
+<meta property="og:url" content="https://nash635.github.io/2025/11/17/TransformerEngine_DeepDive/">
+<meta property="og:site_name" content="My Blog">
+<meta property="og:description" content="Transformer Engine是NVIDIA开发的高性能Transformer模型加速库，支持FP8混合精度训练，显著降低内存占用和提升性能。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-11-17T02:00:03.000Z">
+<meta property="article:modified_time" content="2025-11-17T14:42:49.955Z">
+<meta property="article:author" content="nash635">
+<meta property="article:tag" content="NVIDIA">
+<meta property="article:tag" content="Transformer Engine">
+<meta property="article:tag" content="FP8">
+<meta property="article:tag" content="混合精度">
+<meta property="article:tag" content="GPU加速">
+<meta name="twitter:card" content="summary">
+  
+  
+  
+  <meta name="keywords" content="NVIDIA,Transformer Engine,FP8,混合精度,GPU加速">
+
+  <!-- feed -->
+  
+
+  <link rel="stylesheet" href="/css/main.css?v=1.33.1">
+
+
+  
+
+  
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"nash635","sameAs":[]},"dateCreated":"2025-11-17T10:00:03+08:00","dateModified":"2025-11-17T22:42:49+08:00","datePublished":"2025-11-17T10:00:03+08:00","description":"","headline":"Transformer Engine 架构设计分析","mainEntityOfPage":{"@type":"WebPage","@id":"https://nash635.github.io/2025/11/17/TransformerEngine_DeepDive/"},"publisher":{"@type":"Organization","name":"nash635","sameAs":[]},"url":"https://nash635.github.io/2025/11/17/TransformerEngine_DeepDive/","keywords":"NVIDIA, Transformer Engine, FP8, 混合精度, GPU加速","image":[]}</script>
+  
+</head>
+<body>
+
+<div class="l_body content" id="start" layout="post" type="tech" ><aside class="l_left"><div class="sidebg"></div><div class="leftbar-container">
+
+
+<header class="header"><div class="logo-wrap"><a class="avatar" href="/"><div class="bg" style="opacity:0;background-image:url(https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/avatar/round/rainbow64@3x.webp);"></div><img no-lazy class="avatar" src="/img/avatar.png" onerror="javascript:this.classList.add('error');this.src='https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/image/2659360.svg';"></a><a class="title" href="/"><div class="main">nash635's Blog</div><div class="sub cap">造车，造船，造飞机</div></a></div></header>
+
+<div class="nav-area">
+
+<nav class="menu dis-select"></nav>
+</div>
+<div class="widgets">
+<div class="search-wrapper" id="search-wrapper"><form class="search-form"><a class="search-button" onclick="document.getElementById(&quot;search-input&quot;).focus();"><svg t="1705074644177" viewBox="0 0 1025 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1560" width="200" height="200"><path d="M1008.839137 935.96571L792.364903 719.491476a56.783488 56.783488 0 0 0-80.152866 0 358.53545 358.53545 0 1 1 100.857314-335.166073 362.840335 362.840335 0 0 1-3.689902 170.145468 51.248635 51.248635 0 1 0 99.217358 26.444296 462.057693 462.057693 0 1 0-158.255785 242.303546l185.930047 185.725053a51.248635 51.248635 0 0 0 72.568068 0 51.248635 51.248635 0 0 0 0-72.978056z" p-id="1561"></path><path d="M616.479587 615.969233a50.428657 50.428657 0 0 0-61.498362-5.534852 174.655348 174.655348 0 0 1-177.525271 3.484907 49.403684 49.403684 0 0 0-58.833433 6.76482l-3.074918 2.869923a49.403684 49.403684 0 0 0 8.609771 78.10292 277.767601 277.767601 0 0 0 286.992355-5.739847 49.403684 49.403684 0 0 0 8.404776-76.667958z" p-id="1562"></path></svg></a><input type="text" class="search-input" id="search-input" placeholder="站内搜索"></form><div id="search-result"></div><div class="search-no-result">没有找到内容！</div></div>
+
+
+
+<widget class="widget-wrapper recent post-list"><div class="widget-header dis-select"><span class="name">最近更新</span></div><div class="widget-body fs14"><a class="item title" href="/2025/11/17/HCCL_DeepDive/"><span class="title">HCCL 集合通信库设计分析</span></a><a class="item title" href="/2025/11/17/DeepEP_DeepDive/"><span class="title">DeepEP 架构分析</span></a><a class="item title" href="/2025/11/17/Megatron_DeepDive/"><span class="title">Megatron-LM 架构深度分析</span></a><a class="item title" href="/2025/11/17/TransformerEngine_DeepDive/"><span class="title">Transformer Engine 架构设计分析</span></a><a class="item title" href="/2025/07/24/Hello-World/"><span class="title">Hello World</span></a></div></widget>
+</div>
+
+</div></aside><div class="l_main" id="main">
+
+
+
+
+
+<div class="article banner top">
+  <div class="content">
+    <div class="top bread-nav footnote"><div class="left"><div class="flex-row" id="breadcrumb"><a class="cap breadcrumb" href="/">主页</a>
+<span class="sep"></span><a class="cap breadcrumb" href="/">文章</a><span class="sep"></span><a class="cap breadcrumb-link" href="/categories/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E5%88%86%E6%9E%90/">系统架构分析</a></div>
+<div class="flex-row" id="post-meta"><span class="text created">发布于：<time datetime="2025-11-17T02:00:03.000Z">2025-11-17</time></span><span class="sep updated"></span><span class="text updated">更新于：<time datetime="2025-11-17T14:42:49.955Z">2025-11-17</time></span></div></div></div>
+    
+    <div class="bottom only-title">
+      
+      <div class="text-area">
+        <h1 class="text title"><span>Transformer Engine 架构设计分析</span></h1>
+        
+      </div>
+    </div>
+    
+  </div>
+  </div><article class="md-text content"><h1 id="Transformer-Engine-架构设计分析文档"><a href="#Transformer-Engine-架构设计分析文档" class="headerlink" title="Transformer Engine 架构设计分析文档"></a>Transformer Engine 架构设计分析文档</h1><h2 id="1-项目概述"><a href="#1-项目概述" class="headerlink" title="1. 项目概述"></a>1. 项目概述</h2><h3 id="1-1-项目简介"><a href="#1-1-项目简介" class="headerlink" title="1.1 项目简介"></a>1.1 项目简介</h3><p><strong>Transformer Engine (TE)</strong> 是 NVIDIA 开发的高性能 Transformer 模型加速库，专门用于在 NVIDIA GPU（Hopper、Ada、Blackwell 架构）上加速 Transformer 模型的训练和推理。核心特性是支持 8 位浮点数（FP8）精度，在保持模型精度的同时显著降低内存占用和提升性能。</p>
+<h3 id="1-2-核心特性"><a href="#1-2-核心特性" class="headerlink" title="1.2 核心特性"></a>1.2 核心特性</h3><ul>
+<li><strong>FP8&#x2F;FP4 混合精度训练</strong>：支持 E4M3、E5M2、NVFP4 等多种低精度格式</li>
+<li><strong>框架无关</strong>：提供 C++ API 以及 PyTorch、JAX 的 Python 绑定</li>
+<li><strong>高度优化</strong>：融合算子、优化的 GEMM 内核、cuDNN 集成</li>
+<li><strong>CPU Offload</strong>：支持激活值卸载到 CPU，降低 GPU 内存占用</li>
+<li><strong>易用性</strong>：类似 automatic mixed precision 的 API 设计</li>
+<li><strong>分布式训练支持</strong>：内置 MPI、NVSHMEM 支持</li>
+</ul>
+<h3 id="1-3-技术栈"><a href="#1-3-技术栈" class="headerlink" title="1.3 技术栈"></a>1.3 技术栈</h3><ul>
+<li><strong>核心语言</strong>：C++、CUDA</li>
+<li><strong>Python 绑定</strong>：Pybind11</li>
+<li><strong>深度学习框架</strong>：PyTorch 2.1+、JAX</li>
+<li><strong>构建系统</strong>：CMake、setuptools</li>
+<li><strong>依赖库</strong>：<ul>
+<li><strong>CUDA 12.1+</strong>：GPU 编程基础</li>
+<li><strong>cuBLASLt</strong>：NVIDIA 高性能线性代数库（Lightweight 版本），提供 FP8 GEMM 支持</li>
+<li><strong>cuDNN</strong>：深度神经网络加速库，提供融合注意力实现</li>
+<li><strong>cutlass</strong>：CUDA 模板化线性代数库，用于自定义高性能 kernel</li>
+<li><strong>NCCL</strong>（可选）：多 GPU 通信</li>
+<li><strong>NVSHMEM</strong>（可选）：对称内存访问，低延迟通信</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="2-系统架构设计"><a href="#2-系统架构设计" class="headerlink" title="2. 系统架构设计"></a>2. 系统架构设计</h2><h3 id="2-1-整体架构层次"><a href="#2-1-整体架构层次" class="headerlink" title="2.1 整体架构层次"></a>2.1 整体架构层次</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line">graph TB</span><br><span class="line">    subgraph &quot;用户层 (User Layer)&quot;</span><br><span class="line">        A[PyTorch/JAX 应用代码]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;框架适配层 (Framework Adapter Layer)&quot;</span><br><span class="line">        B1[transformer_engine.pytorch]</span><br><span class="line">        B2[transformer_engine.jax]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Python API 层 (Python API Layer)&quot;</span><br><span class="line">        C1[Module API&lt;br/&gt;Linear, LayerNorm, Attention]</span><br><span class="line">        C2[Quantization API&lt;br/&gt;fp8_autocast, recipes]</span><br><span class="line">        C3[Distributed API&lt;br/&gt;checkpoint, communication]</span><br><span class="line">        C4[Tensor API&lt;br/&gt;Float8Tensor, Quantizer]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;核心计算层 (Core Compute Layer)&quot;</span><br><span class="line">        D[transformer_engine.common&lt;br/&gt;Framework-Agnostic C++ Library]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;算子层 (Operator Layer)&quot;</span><br><span class="line">        E1[GEMM Operators&lt;br/&gt;cuBLAS, cutlass]</span><br><span class="line">        E2[Normalization&lt;br/&gt;LayerNorm, RMSNorm]</span><br><span class="line">        E3[Attention&lt;br/&gt;Fused Attention, FlashAttention]</span><br><span class="line">        E4[Activation&lt;br/&gt;GELU, SwiGLU]</span><br><span class="line">        E5[Communication&lt;br/&gt;NCCL, NVSHMEM]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;硬件层 (Hardware Layer)&quot;</span><br><span class="line">        F[NVIDIA GPU&lt;br/&gt;Hopper/Ada/Blackwell + Tensor Cores]</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    A --&gt; B1</span><br><span class="line">    A --&gt; B2</span><br><span class="line">    B1 --&gt; C1</span><br><span class="line">    B1 --&gt; C2</span><br><span class="line">    B1 --&gt; C3</span><br><span class="line">    B1 --&gt; C4</span><br><span class="line">    B2 --&gt; C1</span><br><span class="line">    B2 --&gt; C2</span><br><span class="line">    C1 --&gt; D</span><br><span class="line">    C2 --&gt; D</span><br><span class="line">    C3 --&gt; D</span><br><span class="line">    C4 --&gt; D</span><br><span class="line">    D --&gt; E1</span><br><span class="line">    D --&gt; E2</span><br><span class="line">    D --&gt; E3</span><br><span class="line">    D --&gt; E4</span><br><span class="line">    D --&gt; E5</span><br><span class="line">    E1 --&gt; F</span><br><span class="line">    E2 --&gt; F</span><br><span class="line">    E3 --&gt; F</span><br><span class="line">    E4 --&gt; F</span><br><span class="line">    E5 --&gt; F</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-2-模块架构"><a href="#2-2-模块架构" class="headerlink" title="2.2 模块架构"></a>2.2 模块架构</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line">graph LR</span><br><span class="line">    subgraph &quot;transformer_engine&quot;</span><br><span class="line">        A[__init__.py]</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;common (C++核心)&quot;</span><br><span class="line">            B1[transformer_engine.cpp]</span><br><span class="line">            B2[gemm/]</span><br><span class="line">            B3[normalization/]</span><br><span class="line">            B4[fused_attn/]</span><br><span class="line">            B5[activation/]</span><br><span class="line">            B6[recipe/]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;pytorch (PyTorch绑定)&quot;</span><br><span class="line">            C1[module/]</span><br><span class="line">            C2[attention/]</span><br><span class="line">            C3[quantization.py]</span><br><span class="line">            C4[distributed.py]</span><br><span class="line">            C5[tensor/]</span><br><span class="line">            C6[ops/]</span><br><span class="line">        end</span><br><span class="line">        </span><br><span class="line">        subgraph &quot;jax (JAX绑定)&quot;</span><br><span class="line">            D1[flax/]</span><br><span class="line">            D2[attention.py]</span><br><span class="line">            D3[dense.py]</span><br><span class="line">            D4[layernorm.py]</span><br><span class="line">        end</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    A --&gt; B1</span><br><span class="line">    A --&gt; C1</span><br><span class="line">    A --&gt; D1</span><br><span class="line">    B1 --&gt; B2</span><br><span class="line">    B1 --&gt; B3</span><br><span class="line">    B1 --&gt; B4</span><br><span class="line">    B1 --&gt; B5</span><br><span class="line">    C1 --&gt; C2</span><br><span class="line">    C1 --&gt; C3</span><br><span class="line">    C1 --&gt; C4</span><br><span class="line">    C1 --&gt; C5</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="3-核心组件详细设计"><a href="#3-核心组件详细设计" class="headerlink" title="3. 核心组件详细设计"></a>3. 核心组件详细设计</h2><h3 id="3-1-Common-Layer-核心-C-库"><a href="#3-1-Common-Layer-核心-C-库" class="headerlink" title="3.1 Common Layer (核心 C++ 库)"></a>3.1 Common Layer (核心 C++ 库)</h3><h4 id="3-1-1-职责"><a href="#3-1-1-职责" class="headerlink" title="3.1.1 职责"></a>3.1.1 职责</h4><ul>
+<li>实现框架无关的核心计算逻辑</li>
+<li>管理 FP8&#x2F;FP4 量化和缩放因子</li>
+<li>提供高性能 CUDA 内核</li>
+<li>类型转换和内存管理</li>
+</ul>
+<h4 id="3-1-2-关键模块"><a href="#3-1-2-关键模块" class="headerlink" title="3.1.2 关键模块"></a>3.1.2 关键模块</h4><p><strong>transformer_engine.cpp</strong></p>
+<ul>
+<li>张量类型定义和验证</li>
+<li>DType 枚举（kFloat32, kFloat16, kBFloat16, kFloat8E4M3, kFloat8E5M2, kFloat4E2M1）</li>
+<li>缩放模式管理（NVTE_DELAYED_TENSOR_SCALING, NVTE_MXFP8_1D_SCALING, NVTE_BLOCK_SCALING_1D&#x2F;2D, NVTE_NVFP4_1D_SCALING）</li>
+<li>张量合法性检查</li>
+</ul>
+<p><strong>gemm&#x2F; (矩阵乘法)</strong></p>
+<ul>
+<li><code>cublaslt_gemm.cu</code>：基于 cuBLASLt 的高性能 GEMM 实现<ul>
+<li>支持 FP8&#x2F;FP16&#x2F;BF16 混合精度</li>
+<li>Fast Accumulator、Epilogue Fusion、自动调优</li>
+<li>详见 11.4 节 cuBLASLt 详细对比</li>
+</ul>
+</li>
+<li><code>cutlass_grouped_gemm.cu</code>：基于 cutlass 的分组 GEMM（用于 MoE）</li>
+</ul>
+<p><strong>normalization&#x2F; (归一化)</strong></p>
+<ul>
+<li>LayerNorm、RMSNorm 的 FP8 实现</li>
+<li>融合的 bias 和 dropout 操作</li>
+<li>Zero-centered gamma 支持</li>
+</ul>
+<p><strong>fused_attn&#x2F; (融合注意力)</strong></p>
+<ul>
+<li>基于 cuDNN 的融合注意力实现</li>
+<li>支持多种 mask 类型（causal, padding, arbitrary）</li>
+<li>滑动窗口注意力（Sliding Window Attention）</li>
+<li>FlashAttention 集成</li>
+</ul>
+<p><strong>activation&#x2F; (激活函数)</strong></p>
+<ul>
+<li>GELU, ReLU, SwiGLU, GEGLU 等</li>
+<li>支持 FP8 输入输出</li>
+<li>融合实现以减少内存访问</li>
+</ul>
+<h3 id="3-2-PyTorch-Adapter-Layer"><a href="#3-2-PyTorch-Adapter-Layer" class="headerlink" title="3.2 PyTorch Adapter Layer"></a>3.2 PyTorch Adapter Layer</h3><h4 id="3-2-1-Module-子系统"><a href="#3-2-1-Module-子系统" class="headerlink" title="3.2.1 Module 子系统"></a>3.2.1 Module 子系统</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line">classDiagram</span><br><span class="line">    class TransformerEngineBaseModule &#123;</span><br><span class="line">        +fp8: bool</span><br><span class="line">        +fp8_calibration: bool</span><br><span class="line">        +fp8_parameters: bool</span><br><span class="line">        +forward()</span><br><span class="line">        +_get_fp8_params()</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class Linear &#123;</span><br><span class="line">        +in_features: int</span><br><span class="line">        +out_features: int</span><br><span class="line">        +weight: Parameter</span><br><span class="line">        +bias: Optional[Parameter]</span><br><span class="line">        +forward(inp: Tensor)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class LayerNormLinear &#123;</span><br><span class="line">        +normalization: str</span><br><span class="line">        +forward(inp: Tensor)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class LayerNormMLP &#123;</span><br><span class="line">        +activation: str</span><br><span class="line">        +ffn_hidden_size: int</span><br><span class="line">        +forward(inp: Tensor)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class GroupedLinear &#123;</span><br><span class="line">        +num_gemms: int</span><br><span class="line">        +forward(inp: Tensor)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    TransformerEngineBaseModule &lt;|-- Linear</span><br><span class="line">    TransformerEngineBaseModule &lt;|-- LayerNormLinear</span><br><span class="line">    TransformerEngineBaseModule &lt;|-- LayerNormMLP</span><br><span class="line">    TransformerEngineBaseModule &lt;|-- GroupedLinear</span><br></pre></td></tr></table></figure>
+
+<p><strong>核心模块</strong>：</p>
+<ol>
+<li><strong>Linear</strong>：基础线性层，支持 FP8 权重和激活</li>
+<li><strong>LayerNormLinear</strong>：融合 LayerNorm + Linear</li>
+<li><strong>LayerNormMLP</strong>：融合 LayerNorm + MLP（两层线性层）</li>
+<li><strong>GroupedLinear</strong>：分组线性层（用于 MoE 等场景）</li>
+<li><strong>LayerNorm&#x2F;RMSNorm</strong>：归一化层</li>
+</ol>
+<h4 id="3-2-2-Attention-子系统"><a href="#3-2-2-Attention-子系统" class="headerlink" title="3.2.2 Attention 子系统"></a>3.2.2 Attention 子系统</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">graph TD</span><br><span class="line">    A[MultiheadAttention] --&gt; B[DotProductAttention]</span><br><span class="line">    A --&gt; C[RotaryPositionEmbedding]</span><br><span class="line">    B --&gt; D[Fused Attention Backend]</span><br><span class="line">    B --&gt; E[Unfused Attention]</span><br><span class="line">    D --&gt; F[cuDNN Fused Attn]</span><br><span class="line">    D --&gt; G[FlashAttention]</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键特性</strong>：</p>
+<ul>
+<li>Multi-Query Attention (MQA)</li>
+<li>Grouped Query Attention (GQA)</li>
+<li>多种 mask 类型支持</li>
+<li>RoPE（Rotary Position Embedding）</li>
+<li>Sliding Window Attention</li>
+<li>InferenceParams for KV cache</li>
+<li>FP8 DPA (Dot Product Attention) 支持</li>
+<li>FP8 MHA (Multi-Head Attention) 端到端优化</li>
+</ul>
+<h4 id="3-2-3-Quantization-子系统"><a href="#3-2-3-Quantization-子系统" class="headerlink" title="3.2.3 Quantization 子系统"></a>3.2.3 Quantization 子系统</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">graph TD</span><br><span class="line">    A[fp8_autocast Context Manager] --&gt; B&#123;Recipe Type&#125;</span><br><span class="line">    B --&gt;|DelayedScaling| C[Delayed Scaling&lt;br/&gt;延迟缩放因子更新]</span><br><span class="line">    B --&gt;|Float8CurrentScaling| D[Current Scaling&lt;br/&gt;当前批次缩放]</span><br><span class="line">    B --&gt;|MXFP8BlockScaling| E[MXFP8 Block Scaling&lt;br/&gt;1D 块级缩放]</span><br><span class="line">    B --&gt;|Float8BlockScaling| F[FP8 Block Scaling&lt;br/&gt;1D/2D 块级缩放]</span><br><span class="line">    B --&gt;|NVFP4BlockScaling| G[NVFP4 Block Scaling&lt;br/&gt;4-bit 量化]</span><br><span class="line">    </span><br><span class="line">    C --&gt; H[FP8MetaManager]</span><br><span class="line">    D --&gt; H</span><br><span class="line">    E --&gt; H</span><br><span class="line">    F --&gt; H</span><br><span class="line">    G --&gt; H</span><br><span class="line">    </span><br><span class="line">    H --&gt; I[Forward/Backward Pass&lt;br/&gt;with FP8]</span><br></pre></td></tr></table></figure>
+
+<p><strong>Recipe 系统</strong>：</p>
+<ul>
+<li><strong>DelayedScaling</strong>：使用历史 amax 统计更新缩放因子</li>
+<li><strong>Float8CurrentScaling</strong>：基于当前批次的 amax</li>
+<li><strong>MXFP8BlockScaling</strong>：Microscaling FP8（适用于 Blackwell）</li>
+<li><strong>Float8BlockScaling</strong>：块级量化（1D&#x2F;2D）</li>
+<li><strong>NVFP4BlockScaling</strong>：4-bit 量化（Blackwell 专用）</li>
+</ul>
+<h4 id="3-2-4-Tensor-子系统"><a href="#3-2-4-Tensor-子系统" class="headerlink" title="3.2.4 Tensor 子系统"></a>3.2.4 Tensor 子系统</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">classDiagram</span><br><span class="line">    class QuantizedTensor &#123;</span><br><span class="line">        +data: Tensor</span><br><span class="line">        +scale_inv: Tensor</span><br><span class="line">        +quantizer: Quantizer</span><br><span class="line">        +dtype: DType</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class Float8Tensor &#123;</span><br><span class="line">        +Float8Quantizer</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class MXFP8Tensor &#123;</span><br><span class="line">        +MXFP8Quantizer</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class Float8BlockwiseQTensor &#123;</span><br><span class="line">        +Float8BlockQuantizer</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    class NVFP4Tensor &#123;</span><br><span class="line">        +NVFP4Quantizer</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    QuantizedTensor &lt;|-- Float8Tensor</span><br><span class="line">    QuantizedTensor &lt;|-- MXFP8Tensor</span><br><span class="line">    QuantizedTensor &lt;|-- Float8BlockwiseQTensor</span><br><span class="line">    QuantizedTensor &lt;|-- NVFP4Tensor</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-3-JAX-Adapter-Layer"><a href="#3-3-JAX-Adapter-Layer" class="headerlink" title="3.3 JAX Adapter Layer"></a>3.3 JAX Adapter Layer</h3><h4 id="3-3-1-Flax-集成"><a href="#3-3-1-Flax-集成" class="headerlink" title="3.3.1 Flax 集成"></a>3.3.1 Flax 集成</h4><ul>
+<li>提供 Flax 兼容的 Module</li>
+<li>JAX JIT 编译支持</li>
+<li>XLA FFI（Foreign Function Interface）集成</li>
+</ul>
+<h4 id="3-3-2-核心模块"><a href="#3-3-2-核心模块" class="headerlink" title="3.3.2 核心模块"></a>3.3.2 核心模块</h4><ul>
+<li><code>Dense</code>：线性层</li>
+<li><code>LayerNorm</code>：归一化层</li>
+<li><code>DotProductAttention</code>：注意力机制</li>
+<li><code>LayerNormMLP</code>：融合 MLP</li>
+</ul>
+<hr>
+<h2 id="4-数据流与调用关系"><a href="#4-数据流与调用关系" class="headerlink" title="4. 数据流与调用关系"></a>4. 数据流与调用关系</h2><blockquote>
+<p><strong>时序图符号说明</strong>：</p>
+<ul>
+<li><code>A-&gt;&gt;B</code>（实线箭头）：A 调用 B 的方法或发送消息</li>
+<li><code>B--&gt;&gt;A</code>（虚线箭头）：B 返回结果给 A（函数返回值或响应）</li>
+<li><code>activate/deactivate</code>：表示组件处于活跃状态的生命周期</li>
+<li>箭头上的文字：说明具体的调用或返回内容</li>
+</ul>
+</blockquote>
+<h3 id="4-1-前向传播数据流"><a href="#4-1-前向传播数据流" class="headerlink" title="4.1 前向传播数据流"></a>4.1 前向传播数据流</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">sequenceDiagram</span><br><span class="line">    participant User as 用户代码</span><br><span class="line">    participant Autocast as fp8_autocast</span><br><span class="line">    participant Module as TE Module&lt;br/&gt;(e.g., Linear)</span><br><span class="line">    participant Quantizer as Quantizer</span><br><span class="line">    participant CPP as C++ Backend</span><br><span class="line">    participant CUDA as CUDA Kernel</span><br><span class="line">    </span><br><span class="line">    User-&gt;&gt;Autocast: with fp8_autocast(recipe)</span><br><span class="line">    activate Autocast</span><br><span class="line">    Autocast-&gt;&gt;Autocast: 设置 FP8 Recipe</span><br><span class="line">    User-&gt;&gt;Module: forward(input)</span><br><span class="line">    activate Module</span><br><span class="line">    </span><br><span class="line">    Module-&gt;&gt;Quantizer: 量化输入 (FP32/BF16 → FP8)</span><br><span class="line">    Quantizer-&gt;&gt;CPP: nvte_cast_to_fp8()</span><br><span class="line">    CPP-&gt;&gt;CUDA: Cast Kernel</span><br><span class="line">    CUDA--&gt;&gt;CPP: FP8 Tensor</span><br><span class="line">    CPP--&gt;&gt;Quantizer: FP8 Tensor</span><br><span class="line">    Quantizer--&gt;&gt;Module: FP8 Input</span><br><span class="line">    </span><br><span class="line">    Module-&gt;&gt;CPP: nvte_fp8_gemm(input, weight)</span><br><span class="line">    CPP-&gt;&gt;CUDA: cuBLASLt FP8 GEMM</span><br><span class="line">    CUDA--&gt;&gt;CPP: FP8 Output</span><br><span class="line">    CPP--&gt;&gt;Module: FP8 Output</span><br><span class="line">    </span><br><span class="line">    Module-&gt;&gt;Quantizer: 反量化输出 (FP8 → FP32/BF16)</span><br><span class="line">    Quantizer-&gt;&gt;CPP: nvte_cast_from_fp8()</span><br><span class="line">    CPP-&gt;&gt;CUDA: Cast Kernel</span><br><span class="line">    CUDA--&gt;&gt;CPP: High Precision Tensor</span><br><span class="line">    CPP--&gt;&gt;Quantizer: Output</span><br><span class="line">    Quantizer--&gt;&gt;Module: Output</span><br><span class="line">    </span><br><span class="line">    Module--&gt;&gt;User: Output</span><br><span class="line">    deactivate Module</span><br><span class="line">    deactivate Autocast</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-反向传播与缩放因子更新"><a href="#4-2-反向传播与缩放因子更新" class="headerlink" title="4.2 反向传播与缩放因子更新"></a>4.2 反向传播与缩放因子更新</h3><blockquote>
+<p><strong>特别说明</strong>：反向传播中的箭头方向与 forward 不同</p>
+<ul>
+<li><strong>实线箭头</strong>：既可以表示”调用 backward()”，也可以表示”传递梯度”</li>
+<li>在 PyTorch Autograd 中，<code>backward()</code> 不是简单的返回值，而是<strong>链式调用</strong>机制</li>
+<li>每个模块计算完梯度后，会<strong>主动调用</strong>前一个节点的 <code>backward()</code>，因此用实线</li>
+</ul>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">sequenceDiagram</span><br><span class="line">    participant Loss as Loss.backward()</span><br><span class="line">    participant Module as TE Module</span><br><span class="line">    participant Autograd as PyTorch Autograd</span><br><span class="line">    participant CPP as C++ Backend</span><br><span class="line">    participant Recipe as FP8 Recipe</span><br><span class="line">    </span><br><span class="line">    Loss-&gt;&gt;Autograd: 触发反向传播</span><br><span class="line">    Autograd-&gt;&gt;Module: backward()</span><br><span class="line">    activate Module</span><br><span class="line">    </span><br><span class="line">    Module-&gt;&gt;CPP: nvte_fp8_gemm_bwd()</span><br><span class="line">    CPP-&gt;&gt;CPP: 计算梯度 (FP8)</span><br><span class="line">    CPP--&gt;&gt;Module: 梯度（返回值）</span><br><span class="line">    </span><br><span class="line">    Note over Module: 计算完成后触发前一层</span><br><span class="line">    Module-&gt;&gt;Autograd: 调用前一层 backward()</span><br><span class="line">    Note right of Module: 这是主动调用，&lt;br/&gt;不是被动返回</span><br><span class="line">    </span><br><span class="line">    Module-&gt;&gt;Recipe: 收集 amax 统计</span><br><span class="line">    Recipe-&gt;&gt;Recipe: 更新缩放因子历史</span><br><span class="line">    </span><br><span class="line">    alt DelayedScaling</span><br><span class="line">        Recipe-&gt;&gt;Recipe: amax_history.append(current_amax)</span><br><span class="line">        Recipe-&gt;&gt;Recipe: scale = max(amax_history) * margin</span><br><span class="line">    else Float8CurrentScaling</span><br><span class="line">        Recipe-&gt;&gt;Recipe: scale = current_amax * margin</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    Recipe--&gt;&gt;Module: 更新的缩放因子</span><br><span class="line">    Module-&gt;&gt;Autograd: 梯度传播（调用前一层）</span><br><span class="line">    deactivate Module</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键概念</strong>：</p>
+<ul>
+<li><strong>Forward Pass</strong>：<code>A → B → C</code>，每层返回输出（虚线返回）</li>
+<li><strong>Backward Pass</strong>：<code>C.backward() → B.backward() → A.backward()</code>，链式调用（实线调用）</li>
+<li>Backward 不是简单的 return，而是触发前一层的计算（Autograd 的核心机制）</li>
+</ul>
+<h3 id="4-3-TransformerLayer-完整调用链"><a href="#4-3-TransformerLayer-完整调用链" class="headerlink" title="4.3 TransformerLayer 完整调用链"></a>4.3 TransformerLayer 完整调用链</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">graph TD</span><br><span class="line">    A[TransformerLayer.forward] --&gt; B&#123;Parallel Attn-MLP?&#125;</span><br><span class="line">    </span><br><span class="line">    B --&gt;|No| C[Self Attention]</span><br><span class="line">    C --&gt; D[Residual + Dropout]</span><br><span class="line">    D --&gt; E[LayerNorm]</span><br><span class="line">    E --&gt; F&#123;Layer Type?&#125;</span><br><span class="line">    F --&gt;|Encoder| G[MLP]</span><br><span class="line">    F --&gt;|Decoder| H[&quot;Cross Attention&lt;br/&gt;(需要Encoder输出)&quot;]</span><br><span class="line">    H --&gt; I[Residual + Dropout]</span><br><span class="line">    I --&gt; G</span><br><span class="line">    G --&gt; J[Residual + Dropout]</span><br><span class="line">    J --&gt; K[Output]</span><br><span class="line">    </span><br><span class="line">    B --&gt;|Yes| L[&quot;输入: hidden_states&quot;]</span><br><span class="line">    L --&gt; M[Self Attention Branch]</span><br><span class="line">    L --&gt; N[MLP Branch]</span><br><span class="line">    M --&gt; O[&quot;直接相加&lt;br/&gt;(不含LayerNorm)&lt;br/&gt;+ Residual&quot;]</span><br><span class="line">    N --&gt; O</span><br><span class="line">    O --&gt; K</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;Self Attention Detail&quot;</span><br><span class="line">        C --&gt; C1[MultiheadAttention]</span><br><span class="line">        C1 --&gt; C2[&quot;QKV Projection&lt;br/&gt;(LayerNormLinear)&quot;]</span><br><span class="line">        C2 --&gt; C3[DotProductAttention]</span><br><span class="line">        C3 --&gt; C4[&quot;Output Projection&lt;br/&gt;(Linear)&quot;]</span><br><span class="line">        C4 --&gt; D</span><br><span class="line">    end</span><br><span class="line">    </span><br><span class="line">    subgraph &quot;MLP Detail&quot;</span><br><span class="line">        G --&gt; G1[LayerNormMLP]</span><br><span class="line">        G1 --&gt; G2[FC1 + Activation]</span><br><span class="line">        G2 --&gt; G3[FC2]</span><br><span class="line">        G3 --&gt; J</span><br><span class="line">    end</span><br></pre></td></tr></table></figure>
+
+<p><strong>关键数据流说明</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># ========== 代码对应（transformer.py 756-840 行） ==========</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 模式1: 标准顺序模式 (parallel_attention_mlp=False)</span></span><br><span class="line"><span class="comment"># --------------------------------------------------------</span></span><br><span class="line"><span class="comment"># 1. Self Attention 完整流程</span></span><br><span class="line">attention_output = <span class="variable language_">self</span>.self_attention(hidden_states)</span><br><span class="line">    <span class="comment"># MultiheadAttention 内部流程 (multi_head_attention.py 773-1002 行)：</span></span><br><span class="line">    <span class="comment"># hidden_states → LayerNormLinear (含LayerNorm) → QKV分离</span></span><br><span class="line">    <span class="comment"># → DotProductAttention (Q*K^T, softmax, *V)</span></span><br><span class="line">    <span class="comment"># → Output Projection Linear → attention_output</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 第一次残差连接 + Dropout</span></span><br><span class="line">hidden_states = bias_dropout_add(attention_output, residual)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. Decoder 模式额外的 Cross Attention</span></span><br><span class="line"><span class="keyword">if</span> layer_type == <span class="string">&quot;decoder&quot;</span>:</span><br><span class="line">    <span class="comment"># Query 来自 Self Attention 输出，Key/Value 来自 Encoder 输出</span></span><br><span class="line">    cross_attn_output = <span class="variable language_">self</span>.inter_attention(</span><br><span class="line">        hidden_states,  <span class="comment"># Query</span></span><br><span class="line">        encoder_output=encoder_output  <span class="comment"># Key/Value</span></span><br><span class="line">    )</span><br><span class="line">    hidden_states = bias_dropout_add(cross_attn_output, hidden_states)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 4. MLP 流程</span></span><br><span class="line">mlp_output = <span class="variable language_">self</span>.layernorm_mlp(hidden_states)</span><br><span class="line">    <span class="comment"># 内部流程：LayerNorm → FC1 → Activation → FC2</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 5. 第二次残差连接 + Dropout</span></span><br><span class="line">output = bias_dropout_add(mlp_output, hidden_states)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 模式2: 并行注意力-MLP模式 (parallel_attention_mlp=True)</span></span><br><span class="line"><span class="comment"># --------------------------------------------------------</span></span><br><span class="line"><span class="comment"># 注意力和MLP并行计算，然后直接相加</span></span><br><span class="line">self_attention_outputs = <span class="variable language_">self</span>.self_attention(hidden_states)</span><br><span class="line">mlp_outputs = <span class="variable language_">self</span>.layernorm_mlp(hidden_states)  <span class="comment"># 同时计算</span></span><br><span class="line">output = bias_dropout_add(</span><br><span class="line">    self_attention_outputs + mlp_outputs,  <span class="comment"># 直接相加</span></span><br><span class="line">    hidden_states  <span class="comment"># 残差</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><strong>注意</strong>：很多架构图会将 Self Attention 画成一个整体模块，从顶部引出输出线。这种表示方法虽然简洁，但容易让人误解 Output Projection Linear 没有对外输出。实际上，<strong>Output Projection 的输出就是整个 Self Attention 模块的输出</strong>。</p>
+<hr>
+<h3 id="4-4-架构图常见误解与代码对照"><a href="#4-4-架构图常见误解与代码对照" class="headerlink" title="4.4 架构图常见误解与代码对照"></a>4.4 架构图常见误解与代码对照</h3><p>通过代码 review，以下是容易误解的几个要点：</p>
+<table>
+<thead>
+<tr>
+<th>架构图表示</th>
+<th>常见误解</th>
+<th>实际代码实现</th>
+<th>代码位置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>QKV Projection (LayerNormLinear)</strong></td>
+<td>LayerNorm 在投影之前单独存在</td>
+<td>LayerNormLinear 内部<strong>已包含</strong> LayerNorm<br/>是融合实现</td>
+<td><code>multi_head_attention.py:773</code><br/><code>self.qkv(hidden_states)</code></td>
+</tr>
+<tr>
+<td><strong>Output Projection 无输出连接</strong></td>
+<td>只有顶部的连接，底部没输出</td>
+<td>Output Projection 的输出<strong>就是</strong> Self Attention 模块的输出<br/>直接连到 Residual + Dropout</td>
+<td><code>multi_head_attention.py:1002-1018</code><br/><code>return (attention_output, ...)</code></td>
+</tr>
+<tr>
+<td><strong>并行模式的”合并”</strong></td>
+<td>两个分支各自做residual再合并</td>
+<td>两个分支输出<strong>直接相加</strong><br/>只做一次 residual</td>
+<td><code>transformer.py:836-840</code><br/><code>bias_dropout_add(attn + mlp, residual)</code></td>
+</tr>
+<tr>
+<td><strong>Decoder Cross Attention</strong></td>
+<td>图中只显示单输入</td>
+<td>需要<strong>两个输入</strong>：<br/>• Query: Self Attn 输出<br/>• Key&#x2F;Value: Encoder 输出</td>
+<td><code>transformer.py:789-819</code><br/><code>inter_attention(hidden_states, encoder_output)</code></td>
+</tr>
+<tr>
+<td><strong>LayerNorm 位置</strong></td>
+<td>在每个模块外部</td>
+<td>Pre-LN：在模块<strong>内部</strong><br/>Post-LN：在模块外部<br/>TE 默认使用 Pre-LN</td>
+<td><code>multi_head_attention.py:input_layernorm=True</code></td>
+</tr>
+</tbody></table>
+<p><strong>关键发现</strong>：</p>
+<ol>
+<li><strong>融合算子</strong>：<code>LayerNormLinear</code> 和 <code>LayerNormMLP</code> 都是融合实现，内部包含 LayerNorm</li>
+<li><strong>Pre-Layer Norm</strong>：TE 默认使用 Pre-LN 架构（LayerNorm 在 Attention&#x2F;MLP 之前）</li>
+<li><strong>残差连接时机</strong>：每个主要模块（Attention、MLP）之后都有残差连接</li>
+<li><strong>并行模式</strong>：是真正的并行（同时计算），不是串行后伪装的并行</li>
+</ol>
+<hr>
+<h2 id="5-关键技术实现"><a href="#5-关键技术实现" class="headerlink" title="5. 关键技术实现"></a>5. 关键技术实现</h2><h3 id="5-1-FP8-量化策略"><a href="#5-1-FP8-量化策略" class="headerlink" title="5.1 FP8 量化策略"></a>5.1 FP8 量化策略</h3><h4 id="5-1-1-延迟缩放（Delayed-Scaling）"><a href="#5-1-1-延迟缩放（Delayed-Scaling）" class="headerlink" title="5.1.1 延迟缩放（Delayed Scaling）"></a>5.1.1 延迟缩放（Delayed Scaling）</h4><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 伪代码</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">DelayedScaling</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, margin=<span class="number">0</span>, interval=<span class="number">1</span>, fp8_format=E4M3</span>):</span><br><span class="line">        <span class="variable language_">self</span>.amax_history = deque(maxlen=interval)</span><br><span class="line">        <span class="variable language_">self</span>.margin = margin</span><br><span class="line">        </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">get_scale</span>(<span class="params">self, tensor</span>):</span><br><span class="line">        amax = tensor.<span class="built_in">abs</span>().<span class="built_in">max</span>()</span><br><span class="line">        <span class="variable language_">self</span>.amax_history.append(amax)</span><br><span class="line">        scale = <span class="built_in">max</span>(<span class="variable language_">self</span>.amax_history) * (<span class="number">1</span> + <span class="variable language_">self</span>.margin) / fp8_max</span><br><span class="line">        <span class="keyword">return</span> scale</span><br></pre></td></tr></table></figure>
+
+<h4 id="5-1-2-块级缩放（Block-Scaling）"><a href="#5-1-2-块级缩放（Block-Scaling）" class="headerlink" title="5.1.2 块级缩放（Block Scaling）"></a>5.1.2 块级缩放（Block Scaling）</h4><ul>
+<li>将张量分成多个块，每个块独立计算缩放因子</li>
+<li>减少量化误差，提高精度</li>
+<li>适用于权重矩阵和激活</li>
+</ul>
+<h3 id="5-2-融合算子优化"><a href="#5-2-融合算子优化" class="headerlink" title="5.2 融合算子优化"></a>5.2 融合算子优化</h3><h4 id="5-2-1-LayerNorm-Linear-融合"><a href="#5-2-1-LayerNorm-Linear-融合" class="headerlink" title="5.2.1 LayerNorm + Linear 融合"></a>5.2.1 LayerNorm + Linear 融合</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">输入: [seq_len, batch, hidden_dim]</span><br><span class="line">↓</span><br><span class="line">LayerNorm (融合 bias + dropout)</span><br><span class="line">↓</span><br><span class="line">FP8 Cast</span><br><span class="line">↓</span><br><span class="line">FP8 GEMM (weight 预先量化)</span><br><span class="line">↓</span><br><span class="line">FP8 Cast Back</span><br><span class="line">↓</span><br><span class="line">输出: [seq_len, batch, out_dim]</span><br></pre></td></tr></table></figure>
+
+<p><strong>优势</strong>：</p>
+<ul>
+<li>减少内存访问次数</li>
+<li>降低量化&#x2F;反量化开销</li>
+<li>提高 GPU 利用率</li>
+</ul>
+<h4 id="5-2-2-Fused-Attention"><a href="#5-2-2-Fused-Attention" class="headerlink" title="5.2.2 Fused Attention"></a>5.2.2 Fused Attention</h4><ul>
+<li>使用 cuDNN 融合的注意力实现</li>
+<li>支持 FlashAttention-2 后端</li>
+<li>自动选择最优实现</li>
+</ul>
+<h3 id="5-3-分布式训练支持"><a href="#5-3-分布式训练支持" class="headerlink" title="5.3 分布式训练支持"></a>5.3 分布式训练支持</h3><h4 id="5-3-1-User-Buffer-UB"><a href="#5-3-1-User-Buffer-UB" class="headerlink" title="5.3.1 User Buffer (UB)"></a>5.3.1 User Buffer (UB)</h4><ul>
+<li>重叠通信和计算</li>
+<li>支持 FP8 通信</li>
+<li>基于 NVSHMEM 的低延迟通信</li>
+</ul>
+<h4 id="5-3-2-Checkpoint"><a href="#5-3-2-Checkpoint" class="headerlink" title="5.3.2 Checkpoint"></a>5.3.2 Checkpoint</h4><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 分布式 checkpoint</span></span><br><span class="line"><span class="keyword">from</span> transformer_engine.pytorch <span class="keyword">import</span> checkpoint</span><br><span class="line"></span><br><span class="line"><span class="comment"># 保存</span></span><br><span class="line">checkpoint(model, optimizer, save_dir, dist_group)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 加载</span></span><br><span class="line">checkpoint.load(model, optimizer, load_dir, dist_group)</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="6-性能优化策略"><a href="#6-性能优化策略" class="headerlink" title="6. 性能优化策略"></a>6. 性能优化策略</h2><h3 id="6-1-内存优化"><a href="#6-1-内存优化" class="headerlink" title="6.1 内存优化"></a>6.1 内存优化</h3><ol>
+<li><strong>FP8 量化</strong>：减少 50% 内存占用</li>
+<li><strong>Gradient Checkpointing</strong>：重计算中间激活</li>
+<li><strong>CPU Offloading</strong>：将激活值卸载到 CPU 内存<ul>
+<li>使用 <code>get_cpu_offload_context()</code> 管理卸载</li>
+<li>支持异步数据传输，减少性能影响</li>
+<li>适用于超大模型训练</li>
+</ul>
+</li>
+</ol>
+<h3 id="6-2-计算优化"><a href="#6-2-计算优化" class="headerlink" title="6.2 计算优化"></a>6.2 计算优化</h3><ol>
+<li><strong>Tensor Core 利用</strong>：FP8 Tensor Core 吞吐量是 FP16 的 2 倍</li>
+<li><strong>融合算子</strong>：减少 kernel launch 开销</li>
+<li><strong>cuDNN 集成</strong>：使用 cuDNN 优化的注意力实现</li>
+</ol>
+<h3 id="6-3-通信优化"><a href="#6-3-通信优化" class="headerlink" title="6.3 通信优化"></a>6.3 通信优化</h3><ol>
+<li><strong>FP8 All-Reduce</strong>：减少通信数据量</li>
+<li><strong>通信计算重叠</strong>：User Buffer 机制</li>
+<li><strong>NVSHMEM</strong>：低延迟点对点通信</li>
+</ol>
+<hr>
+<h2 id="7-扩展性与依赖"><a href="#7-扩展性与依赖" class="headerlink" title="7. 扩展性与依赖"></a>7. 扩展性与依赖</h2><h3 id="7-1-自定义-Recipe"><a href="#7-1-自定义-Recipe" class="headerlink" title="7.1 自定义 Recipe"></a>7.1 自定义 Recipe</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> transformer_engine.common.recipe <span class="keyword">import</span> CustomRecipe</span><br><span class="line"></span><br><span class="line">custom_recipe = CustomRecipe(</span><br><span class="line">    margin=<span class="number">0.1</span>, fp8_format=Format.HYBRID,</span><br><span class="line">    amax_history_len=<span class="number">10</span>, amax_compute_algo=<span class="string">&#x27;max&#x27;</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-2-自定义算子"><a href="#7-2-自定义算子" class="headerlink" title="7.2 自定义算子"></a>7.2 自定义算子</h3><p>通过 C++ API 扩展新算子，使用 Pybind11 暴露到 Python</p>
+<h3 id="7-3-框架支持"><a href="#7-3-框架支持" class="headerlink" title="7.3 框架支持"></a>7.3 框架支持</h3><p>PyTorch（完整支持）、JAX&#x2F;Flax、其他框架（通过 C++ API）</p>
+<h3 id="7-4-依赖关系"><a href="#7-4-依赖关系" class="headerlink" title="7.4 依赖关系"></a>7.4 依赖关系</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">graph TD</span><br><span class="line">    A[TransformerEngine] --&gt; B[CUDA 12.1+]</span><br><span class="line">    A --&gt; C[cuDNN]</span><br><span class="line">    A --&gt; D[cuBLASLt]</span><br><span class="line">    A --&gt; E[PyTorch 2.1+ / JAX]</span><br><span class="line">    A --&gt; F[cutlass]</span><br><span class="line">    A -.-&gt; G[NCCL/MPI/NVSHMEM&lt;br/&gt;可选]</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="8-使用示例"><a href="#8-使用示例" class="headerlink" title="8. 使用示例"></a>8. 使用示例</h2><h3 id="PyTorch-基础示例"><a href="#PyTorch-基础示例" class="headerlink" title="PyTorch 基础示例"></a>PyTorch 基础示例</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> torch</span><br><span class="line"><span class="keyword">import</span> transformer_engine.pytorch <span class="keyword">as</span> te</span><br><span class="line"><span class="keyword">from</span> transformer_engine.common <span class="keyword">import</span> recipe</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建模型</span></span><br><span class="line">model = te.Linear(<span class="number">768</span>, <span class="number">3072</span>, bias=<span class="literal">True</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 FP8 Recipe</span></span><br><span class="line">fp8_recipe = recipe.DelayedScaling(</span><br><span class="line">    margin=<span class="number">0</span>,</span><br><span class="line">    fp8_format=recipe.Format.HYBRID</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 前向传播（启用 FP8）</span></span><br><span class="line"><span class="keyword">with</span> te.fp8_autocast(enabled=<span class="literal">True</span>, recipe=fp8_recipe):</span><br><span class="line">    output = model(<span class="built_in">input</span>)</span><br></pre></td></tr></table></figure>
+
+<h3 id="TransformerLayer-示例"><a href="#TransformerLayer-示例" class="headerlink" title="TransformerLayer 示例"></a>TransformerLayer 示例</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">layer = te.TransformerLayer(</span><br><span class="line">    hidden_size=<span class="number">1024</span>,</span><br><span class="line">    ffn_hidden_size=<span class="number">4096</span>,</span><br><span class="line">    num_attention_heads=<span class="number">16</span>,</span><br><span class="line">    num_gqa_groups=<span class="number">8</span>,  <span class="comment"># Grouped Query Attention</span></span><br><span class="line">    layernorm_epsilon=<span class="number">1e-5</span>,</span><br><span class="line">    hidden_dropout=<span class="number">0.1</span>,</span><br><span class="line">    attention_dropout=<span class="number">0.1</span>,</span><br><span class="line">    self_attn_mask_type=<span class="string">&#x27;causal&#x27;</span>,</span><br><span class="line">    normalization=<span class="string">&#x27;RMSNorm&#x27;</span>,</span><br><span class="line">    activation=<span class="string">&#x27;swiglu&#x27;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="keyword">with</span> te.fp8_autocast(enabled=<span class="literal">True</span>, recipe=fp8_recipe):</span><br><span class="line">    output = layer(hidden_states, attention_mask)</span><br></pre></td></tr></table></figure>
+
+<h3 id="CPU-Offload-示例"><a href="#CPU-Offload-示例" class="headerlink" title="CPU Offload 示例"></a>CPU Offload 示例</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> transformer_engine.pytorch <span class="keyword">import</span> get_cpu_offload_context</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建 CPU Offload 上下文</span></span><br><span class="line">cpu_offload_ctx, sync_fn = get_cpu_offload_context(</span><br><span class="line">    enabled=<span class="literal">True</span>,</span><br><span class="line">    num_layers=<span class="number">24</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 在训练循环中使用</span></span><br><span class="line"><span class="keyword">with</span> cpu_offload_ctx:</span><br><span class="line">    output = model(<span class="built_in">input</span>)</span><br><span class="line">    loss = criterion(output, target)</span><br><span class="line">    </span><br><span class="line"><span class="comment"># 同步等待异步传输完成</span></span><br><span class="line">sync_fn()</span><br><span class="line">loss.backward()</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="9-架构设计优势"><a href="#9-架构设计优势" class="headerlink" title="9. 架构设计优势"></a>9. 架构设计优势</h2><ol>
+<li><strong>模块化</strong>：清晰分层（User API → Adapter → Core → Hardware），松耦合易扩展</li>
+<li><strong>高性能</strong>：零拷贝设计、融合算子、硬件感知优化</li>
+<li><strong>易用性</strong>：Pythonic API、自动管理缩放因子、灵活的 Recipe 系统</li>
+<li><strong>工业级</strong>：完备测试、齐全文档、持续集成</li>
+</ol>
+<hr>
+<h2 id="10-技术挑战与解决方案"><a href="#10-技术挑战与解决方案" class="headerlink" title="10. 技术挑战与解决方案"></a>10. 技术挑战与解决方案</h2><h3 id="10-1-数值稳定性"><a href="#10-1-数值稳定性" class="headerlink" title="10.1 数值稳定性"></a>10.1 数值稳定性</h3><p><strong>挑战</strong>：FP8 动态范围小，容易溢出&#x2F;下溢<br><strong>解决方案</strong>：</p>
+<ul>
+<li>Delayed Scaling 策略</li>
+<li>Amax 历史追踪</li>
+<li>Margin 参数调整</li>
+</ul>
+<h3 id="10-2-性能瓶颈"><a href="#10-2-性能瓶颈" class="headerlink" title="10.2 性能瓶颈"></a>10.2 性能瓶颈</h3><p><strong>挑战</strong>：量化&#x2F;反量化开销<br><strong>解决方案</strong>：</p>
+<ul>
+<li>融合算子</li>
+<li>预量化权重</li>
+<li>端到端 FP8 流程</li>
+</ul>
+<h3 id="10-3-框架兼容性"><a href="#10-3-框架兼容性" class="headerlink" title="10.3 框架兼容性"></a>10.3 框架兼容性</h3><p><strong>挑战</strong>：不同框架的 autograd 机制不同<br><strong>解决方案</strong>：</p>
+<ul>
+<li>框架无关的 C++ 核心</li>
+<li>适配层抽象差异</li>
+<li>Custom Autograd Functions</li>
+</ul>
+<h3 id="10-4-cuBLASLt-vs-cuBLAS-选择"><a href="#10-4-cuBLASLt-vs-cuBLAS-选择" class="headerlink" title="10.4 cuBLASLt vs cuBLAS 选择"></a>10.4 cuBLASLt vs cuBLAS 选择</h3><p><strong>挑战</strong>：为什么使用 cuBLASLt 而不是传统 cuBLAS？<br><strong>原因分析</strong>：</p>
+<ul>
+<li><strong>FP8 支持</strong>：cuBLAS 不支持 FP8 数据类型，cuBLASLt 从 CUDA 11.8+ 开始原生支持</li>
+<li><strong>灵活性</strong>：cuBLASLt 的描述符（Descriptor）API 允许精细控制每个操作细节</li>
+<li><strong>性能优化</strong>：<ul>
+<li>Fast Accumulator（快速累加器）：针对 Hopper 架构的分块累加优化</li>
+<li>Epilogue Fusion：将 bias、激活函数等后处理融合到 GEMM kernel 中</li>
+<li>自动调优：根据矩阵大小和硬件特性自动选择最优算法</li>
+</ul>
+</li>
+<li><strong>缩放因子集成</strong>：直接支持 FP8 的 scale 和 scale_inv 参数，无需额外的 kernel launch</li>
+</ul>
+<p><strong>代码对比</strong>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// cuBLAS (传统 API，不支持 FP8)</span></span><br><span class="line"><span class="built_in">cublasSgemm</span>(handle, CUBLAS_OP_N, CUBLAS_OP_N, </span><br><span class="line">            m, n, k, &amp;alpha, A, lda, B, ldb, &amp;beta, C, ldc);</span><br><span class="line"></span><br><span class="line"><span class="comment">// cuBLASLt (描述符 API，支持 FP8)</span></span><br><span class="line"><span class="built_in">cublasLtMatmul</span>(handle, matmulDesc, &amp;alpha,</span><br><span class="line">               A, Adesc,  <span class="comment">// 可指定 FP8 类型和缩放因子</span></span><br><span class="line">               B, Bdesc, </span><br><span class="line">               &amp;beta, C, Cdesc, C, Cdesc,</span><br><span class="line">               &amp;algo, workspace, workspaceSize, stream);</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="11-未来发展方向"><a href="#11-未来发展方向" class="headerlink" title="11. 未来发展方向"></a>11. 未来发展方向</h2><h3 id="12-1-新硬件支持"><a href="#12-1-新硬件支持" class="headerlink" title="12.1 新硬件支持"></a>12.1 新硬件支持</h3><ul>
+<li><strong>Blackwell 架构优化</strong>：MXFP8、NVFP4</li>
+<li><strong>多 GPU 架构</strong>：更好的多卡支持</li>
+</ul>
+<h3 id="12-2-新功能"><a href="#12-2-新功能" class="headerlink" title="12.2 新功能"></a>12.2 新功能</h3><ul>
+<li><strong>更多融合算子</strong>：Softmax, Dropout 等</li>
+<li><strong>量化感知训练（QAT）</strong></li>
+<li><strong>混合精度策略优化</strong></li>
+</ul>
+<h3 id="12-3-生态系统集成"><a href="#12-3-生态系统集成" class="headerlink" title="12.3 生态系统集成"></a>12.3 生态系统集成</h3><ul>
+<li><strong>Megatron-LM 集成</strong></li>
+<li><strong>HuggingFace Transformers 支持</strong></li>
+<li><strong>ONNX 导出优化</strong></li>
+</ul>
+<hr>
+<h2 id="12-总结"><a href="#12-总结" class="headerlink" title="12. 总结"></a>12. 总结</h2><p>Transformer Engine 是 NVIDIA 开发的<strong>高度模块化、性能优先、易于使用</strong>的 Transformer 加速库。其核心架构设计为大规模 Transformer 模型的高效训练和推理提供了坚实基础，特点包括：分层清晰、框架无关、高性能 FP8 量化、易扩展的 Recipe 系统，以及工业级的测试和文档体系。</p>
+<hr>
+<h2 id="附录"><a href="#附录" class="headerlink" title="附录"></a>附录</h2><p><strong>关键文件</strong>：</p>
+<ul>
+<li>C++ 核心：<code>transformer_engine/common/</code> (transformer_engine.cpp, gemm&#x2F;, fused_attn&#x2F;, normalization&#x2F;)</li>
+<li>PyTorch：<code>transformer_engine/pytorch/</code> (module&#x2F;, attention&#x2F;, quantization.py)</li>
+<li>JAX：<code>transformer_engine/jax/</code> (flax&#x2F;, attention.py)</li>
+</ul>
+<p><strong>资源链接</strong>：</p>
+<ul>
+<li>官方文档：<a target="_blank" rel="noopener" href="https://docs.nvidia.com/deeplearning/transformer-engine/">https://docs.nvidia.com/deeplearning/transformer-engine/</a></li>
+<li>GitHub：<a target="_blank" rel="noopener" href="https://github.com/NVIDIA/TransformerEngine">https://github.com/NVIDIA/TransformerEngine</a></li>
+</ul>
+<hr>
+</article>
+<div class="article-footer">
+    <section id="license">
+      <div class="header"><span>许可协议</span></div>
+      <div class="body"><p>本文采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">署名-非商业性使用-相同方式共享 4.0 国际</a> 许可协议，转载请注明出处。</p>
+</div>
+    </section>
+    
+
+</div>
+
+<div class="related-wrap" id="read-next"><section class="body"><div class="item" id="prev"></div><div class="item" id="next"><div class="note">较早文章</div><a href="/2025/11/17/Megatron_DeepDive/">Megatron-LM 架构深度分析</a></div></section></div>
+
+
+
+
+  <div class="related-wrap md-text" id="comments">
+    <section class='header cmt-title cap theme'>
+      <p>快来参与讨论吧~</p>
+
+    </section>
+    <section class='body cmt-body giscus'>
+      
+
+<svg class="loading" style="vertical-align:middle;fill:currentColor;overflow:hidden;" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2709"><path d="M832 512c0-176-144-320-320-320V128c211.2 0 384 172.8 384 384h-64zM192 512c0 176 144 320 320 320v64C300.8 896 128 723.2 128 512h64z" p-id="2710"></path></svg>
+
+<div id="giscus" src="https://giscus.app/client.js" data-repo="nash635/nash635.github.io" data-repo-id="R_kgDOKBdEtA" data-category="General" data-category-id="DIC_kwDOKBdEtM4CxbhU" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous"></div>
+
+    </section>
+  </div>
+
+
+
+<footer class="page-footer footnote"><hr><div class="text"><p>本站由 <a href="/">nash635</a> 使用 <a target="_blank" rel="noopener" href="https://github.com/xaoxuu/hexo-theme-stellar/tree/1.33.1">Stellar 1.33.1</a> 主题创建。<br>本博客所有文章除特别声明外，均采用 <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可协议，转载请注明出处。</p>
+</div></footer>
+<div class="main-mask" onclick="sidebar.dismiss()"></div></div><aside class="l_right">
+<div class="widgets">
+
+
+
+<widget class="widget-wrapper toc" id="data-toc" collapse="false"><div class="widget-header dis-select"><span class="name">本文目录</span><a class="cap-action" onclick="sidebar.toggleTOC()" ><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6h11m-11 6h11m-11 6h11M4 6h1v4m-1 0h2m0 8H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></a></div><div class="widget-body"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Transformer-Engine-%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1%E5%88%86%E6%9E%90%E6%96%87%E6%A1%A3"><span class="toc-text">Transformer Engine 架构设计分析文档</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E9%A1%B9%E7%9B%AE%E6%A6%82%E8%BF%B0"><span class="toc-text">1. 项目概述</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-1-%E9%A1%B9%E7%9B%AE%E7%AE%80%E4%BB%8B"><span class="toc-text">1.1 项目简介</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-2-%E6%A0%B8%E5%BF%83%E7%89%B9%E6%80%A7"><span class="toc-text">1.2 核心特性</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-3-%E6%8A%80%E6%9C%AF%E6%A0%88"><span class="toc-text">1.3 技术栈</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1"><span class="toc-text">2. 系统架构设计</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-1-%E6%95%B4%E4%BD%93%E6%9E%B6%E6%9E%84%E5%B1%82%E6%AC%A1"><span class="toc-text">2.1 整体架构层次</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-%E6%A8%A1%E5%9D%97%E6%9E%B6%E6%9E%84"><span class="toc-text">2.2 模块架构</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E6%A0%B8%E5%BF%83%E7%BB%84%E4%BB%B6%E8%AF%A6%E7%BB%86%E8%AE%BE%E8%AE%A1"><span class="toc-text">3. 核心组件详细设计</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-Common-Layer-%E6%A0%B8%E5%BF%83-C-%E5%BA%93"><span class="toc-text">3.1 Common Layer (核心 C++ 库)</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-1-1-%E8%81%8C%E8%B4%A3"><span class="toc-text">3.1.1 职责</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-1-2-%E5%85%B3%E9%94%AE%E6%A8%A1%E5%9D%97"><span class="toc-text">3.1.2 关键模块</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-2-PyTorch-Adapter-Layer"><span class="toc-text">3.2 PyTorch Adapter Layer</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-2-1-Module-%E5%AD%90%E7%B3%BB%E7%BB%9F"><span class="toc-text">3.2.1 Module 子系统</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-2-2-Attention-%E5%AD%90%E7%B3%BB%E7%BB%9F"><span class="toc-text">3.2.2 Attention 子系统</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-2-3-Quantization-%E5%AD%90%E7%B3%BB%E7%BB%9F"><span class="toc-text">3.2.3 Quantization 子系统</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-2-4-Tensor-%E5%AD%90%E7%B3%BB%E7%BB%9F"><span class="toc-text">3.2.4 Tensor 子系统</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-3-JAX-Adapter-Layer"><span class="toc-text">3.3 JAX Adapter Layer</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#3-3-1-Flax-%E9%9B%86%E6%88%90"><span class="toc-text">3.3.1 Flax 集成</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-3-2-%E6%A0%B8%E5%BF%83%E6%A8%A1%E5%9D%97"><span class="toc-text">3.3.2 核心模块</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E6%95%B0%E6%8D%AE%E6%B5%81%E4%B8%8E%E8%B0%83%E7%94%A8%E5%85%B3%E7%B3%BB"><span class="toc-text">4. 数据流与调用关系</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-%E5%89%8D%E5%90%91%E4%BC%A0%E6%92%AD%E6%95%B0%E6%8D%AE%E6%B5%81"><span class="toc-text">4.1 前向传播数据流</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-%E5%8F%8D%E5%90%91%E4%BC%A0%E6%92%AD%E4%B8%8E%E7%BC%A9%E6%94%BE%E5%9B%A0%E5%AD%90%E6%9B%B4%E6%96%B0"><span class="toc-text">4.2 反向传播与缩放因子更新</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-TransformerLayer-%E5%AE%8C%E6%95%B4%E8%B0%83%E7%94%A8%E9%93%BE"><span class="toc-text">4.3 TransformerLayer 完整调用链</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-4-%E6%9E%B6%E6%9E%84%E5%9B%BE%E5%B8%B8%E8%A7%81%E8%AF%AF%E8%A7%A3%E4%B8%8E%E4%BB%A3%E7%A0%81%E5%AF%B9%E7%85%A7"><span class="toc-text">4.4 架构图常见误解与代码对照</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E5%85%B3%E9%94%AE%E6%8A%80%E6%9C%AF%E5%AE%9E%E7%8E%B0"><span class="toc-text">5. 关键技术实现</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-FP8-%E9%87%8F%E5%8C%96%E7%AD%96%E7%95%A5"><span class="toc-text">5.1 FP8 量化策略</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#5-1-1-%E5%BB%B6%E8%BF%9F%E7%BC%A9%E6%94%BE%EF%BC%88Delayed-Scaling%EF%BC%89"><span class="toc-text">5.1.1 延迟缩放（Delayed Scaling）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5-1-2-%E5%9D%97%E7%BA%A7%E7%BC%A9%E6%94%BE%EF%BC%88Block-Scaling%EF%BC%89"><span class="toc-text">5.1.2 块级缩放（Block Scaling）</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-%E8%9E%8D%E5%90%88%E7%AE%97%E5%AD%90%E4%BC%98%E5%8C%96"><span class="toc-text">5.2 融合算子优化</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#5-2-1-LayerNorm-Linear-%E8%9E%8D%E5%90%88"><span class="toc-text">5.2.1 LayerNorm + Linear 融合</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5-2-2-Fused-Attention"><span class="toc-text">5.2.2 Fused Attention</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-3-%E5%88%86%E5%B8%83%E5%BC%8F%E8%AE%AD%E7%BB%83%E6%94%AF%E6%8C%81"><span class="toc-text">5.3 分布式训练支持</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#5-3-1-User-Buffer-UB"><span class="toc-text">5.3.1 User Buffer (UB)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5-3-2-Checkpoint"><span class="toc-text">5.3.2 Checkpoint</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E7%AD%96%E7%95%A5"><span class="toc-text">6. 性能优化策略</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#6-1-%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="toc-text">6.1 内存优化</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-2-%E8%AE%A1%E7%AE%97%E4%BC%98%E5%8C%96"><span class="toc-text">6.2 计算优化</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-3-%E9%80%9A%E4%BF%A1%E4%BC%98%E5%8C%96"><span class="toc-text">6.3 通信优化</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-%E6%89%A9%E5%B1%95%E6%80%A7%E4%B8%8E%E4%BE%9D%E8%B5%96"><span class="toc-text">7. 扩展性与依赖</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#7-1-%E8%87%AA%E5%AE%9A%E4%B9%89-Recipe"><span class="toc-text">7.1 自定义 Recipe</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-2-%E8%87%AA%E5%AE%9A%E4%B9%89%E7%AE%97%E5%AD%90"><span class="toc-text">7.2 自定义算子</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-3-%E6%A1%86%E6%9E%B6%E6%94%AF%E6%8C%81"><span class="toc-text">7.3 框架支持</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-4-%E4%BE%9D%E8%B5%96%E5%85%B3%E7%B3%BB"><span class="toc-text">7.4 依赖关系</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-%E4%BD%BF%E7%94%A8%E7%A4%BA%E4%BE%8B"><span class="toc-text">8. 使用示例</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#PyTorch-%E5%9F%BA%E7%A1%80%E7%A4%BA%E4%BE%8B"><span class="toc-text">PyTorch 基础示例</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#TransformerLayer-%E7%A4%BA%E4%BE%8B"><span class="toc-text">TransformerLayer 示例</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#CPU-Offload-%E7%A4%BA%E4%BE%8B"><span class="toc-text">CPU Offload 示例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#9-%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1%E4%BC%98%E5%8A%BF"><span class="toc-text">9. 架构设计优势</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#10-%E6%8A%80%E6%9C%AF%E6%8C%91%E6%88%98%E4%B8%8E%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="toc-text">10. 技术挑战与解决方案</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#10-1-%E6%95%B0%E5%80%BC%E7%A8%B3%E5%AE%9A%E6%80%A7"><span class="toc-text">10.1 数值稳定性</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-2-%E6%80%A7%E8%83%BD%E7%93%B6%E9%A2%88"><span class="toc-text">10.2 性能瓶颈</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-3-%E6%A1%86%E6%9E%B6%E5%85%BC%E5%AE%B9%E6%80%A7"><span class="toc-text">10.3 框架兼容性</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-4-cuBLASLt-vs-cuBLAS-%E9%80%89%E6%8B%A9"><span class="toc-text">10.4 cuBLASLt vs cuBLAS 选择</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#11-%E6%9C%AA%E6%9D%A5%E5%8F%91%E5%B1%95%E6%96%B9%E5%90%91"><span class="toc-text">11. 未来发展方向</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#12-1-%E6%96%B0%E7%A1%AC%E4%BB%B6%E6%94%AF%E6%8C%81"><span class="toc-text">12.1 新硬件支持</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#12-2-%E6%96%B0%E5%8A%9F%E8%83%BD"><span class="toc-text">12.2 新功能</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#12-3-%E7%94%9F%E6%80%81%E7%B3%BB%E7%BB%9F%E9%9B%86%E6%88%90"><span class="toc-text">12.3 生态系统集成</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#12-%E6%80%BB%E7%BB%93"><span class="toc-text">12. 总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%99%84%E5%BD%95"><span class="toc-text">附录</span></a></li></ol></li></ol></div><div class="widget-footer"><a class="top" onclick="util.scrollTop()"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path stroke-linejoin="round" d="m9 15.5l3-3l3 3m-6-4l3-3l3 3"/><path d="M7 3.338A9.95 9.95 0 0 1 12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12c0-1.821.487-3.53 1.338-5"/></g></svg><span>回到顶部</span></a><a class="buttom" onclick="util.scrollComment()"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><!-- Icon from Solar by 480 Design - https://creativecommons.org/licenses/by/4.0/ --><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M8 10.5h8M8 14h5.5M17 3.338A9.95 9.95 0 0 0 12 2C6.477 2 2 6.477 2 12c0 1.6.376 3.112 1.043 4.453c.178.356.237.763.134 1.148l-.595 2.226a1.3 1.3 0 0 0 1.591 1.592l2.226-.596a1.63 1.63 0 0 1 1.149.133A9.96 9.96 0 0 0 12 22c5.523 0 10-4.477 10-10c0-1.821-.487-3.53-1.338-5"/></svg><span>参与讨论</span></a></div></widget>
+</div></aside><div class='float-panel'>
+  <button type='button' style='display:none' class='laptop-only rightbar-toggle mobile' onclick='sidebar.rightbar()'>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6h11m-11 6h11m-11 6h11M4 6h1v4m-1 0h2m0 8H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+  </button>
+  <button type='button' style='display:none' class='mobile-only leftbar-toggle mobile' onclick='sidebar.leftbar()'>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 11c0-3.771 0-5.657 1.172-6.828C4.343 3 6.229 3 10 3h4c3.771 0 5.657 0 6.828 1.172C22 5.343 22 7.229 22 11v2c0 3.771 0 5.657-1.172 6.828C19.657 21 17.771 21 14 21h-4c-3.771 0-5.657 0-6.828-1.172C2 18.657 2 16.771 2 13z"/><path id="sep" stroke-linecap="round" d="M5.5 10h6m-5 4h4m4.5 7V3"/></g></svg>
+  </button>
+</div>
+</div><div class="scripts">
+
+
+<script type="text/javascript">
+  window.canonical = {"originalHost":null,"officialHosts":["localhost"],"encoded":""};
+  const ctx = {
+    date_suffix: {
+      just: `刚刚`,
+      min: `分钟前`,
+      hour: `小时前`,
+      day: `天前`,
+    },
+    root : `/`,
+    tag_plugins: {
+      chat: Object.assign({"api":"https://siteinfo.listentothewind.cn/api/v1"}),
+    }
+  };
+
+  // required plugins (only load if needs)
+  if (`local_search`) {
+    ctx.search = {};
+    ctx.search.service = `local_search`;
+    if (ctx.search.service == 'local_search') {
+      let service_obj = Object.assign({}, `{"field":"all","path":"/search.json","content":true,"skip_search":null,"sort":"-date"}`);
+      ctx.search[ctx.search.service] = service_obj;
+    }
+  }
+  const def = {
+    avatar: `https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/avatar/round/3442075.svg`,
+    cover: `https://gcore.jsdelivr.net/gh/cdn-x/placeholder@1.0.12/cover/76b86c0226ffd.svg`,
+    loading: `https://api.iconify.design/eos-icons:three-dots-loading.svg?color=%231cd0fd`,
+  };
+  const deps = {
+    jquery: `https://gcore.jsdelivr.net/npm/jquery@3.7/dist/jquery.min.js`,
+    marked: `https://gcore.jsdelivr.net/npm/marked@13.0/lib/marked.umd.min.js`,
+    lazyload: `/%5Bobject%20Object%5D`
+  }
+  
+
+</script>
+
+<script type="text/javascript">
+  
+  function RunItem() {
+    this.list = []; // 存放回调函数
+    this.start = () => {
+      for (var i = 0; i < this.list.length; i++) {
+        this.list[i].run();
+      }
+    };
+    this.push = (fn, name, setRequestAnimationFrame = true) => {
+      let myfn = fn
+      if (setRequestAnimationFrame) {
+        myfn = () => {
+          utils.requestAnimationFrame(fn)
+        }
+      }
+      var f = new Item(myfn, name);
+      this.list.push(f);
+    };
+    this.remove = (name) => {
+      for (let index = 0; index < this.list.length; index++) {
+        const e = this.list[index];
+        if (e.name == name) {
+          this.list.splice(index, 1);
+        }
+      }
+    }
+    // 构造一个可以run的对象
+    function Item(fn, name) {
+      // 函数名称
+      this.name = name || fn.name;
+      // run方法
+      this.run = () => {
+        try {
+          fn()
+        } catch (error) {
+          console.log(error);
+        }
+      };
+    }
+  }
+
+  const utils = {
+    // 懒加载 css https://github.com/filamentgroup/loadCSS
+    css: (href, before, media, attributes) => {
+      var doc = window.document;
+      var ss = doc.createElement("link");
+      var ref;
+      if (before) {
+        ref = before;
+      } else {
+        var refs = (doc.body || doc.getElementsByTagName("head")[0]).childNodes;
+        ref = refs[refs.length - 1];
+      }
+      var sheets = doc.styleSheets;
+      if (attributes) {
+        for (var attributeName in attributes) {
+          if (attributes.hasOwnProperty(attributeName)) {
+            ss.setAttribute(attributeName, attributes[attributeName]);
+          }
+        }
+      }
+      ss.rel = "stylesheet";
+      ss.href = href;
+      ss.media = "only x";
+      function ready(cb) {
+        if (doc.body) {
+          return cb();
+        }
+        setTimeout(function () {
+          ready(cb);
+        });
+      }
+      ready(function () {
+        ref.parentNode.insertBefore(ss, before ? ref : ref.nextSibling);
+      });
+      var onloadcssdefined = function (cb) {
+        var resolvedHref = ss.href;
+        var i = sheets.length;
+        while (i--) {
+          if (sheets[i].href === resolvedHref) {
+            return cb();
+          }
+        }
+        setTimeout(function () {
+          onloadcssdefined(cb);
+        });
+      };
+      function loadCB() {
+        if (ss.addEventListener) {
+          ss.removeEventListener("load", loadCB);
+        }
+        ss.media = media || "all";
+      }
+      if (ss.addEventListener) {
+        ss.addEventListener("load", loadCB);
+      }
+      ss.onloadcssdefined = onloadcssdefined;
+      onloadcssdefined(loadCB);
+      return ss;
+    },
+
+    js: (src, opt) => new Promise((resolve, reject) => {
+      var script = document.createElement('script');
+      if (src.startsWith('/')) {
+        src = ctx.root + src.substring(1);
+      }
+      script.src = src;
+      if (opt) {
+        for (let key of Object.keys(opt)) {
+          script[key] = opt[key]
+        }
+      } else {
+        // 默认异步，如果需要同步，第二个参数传入 {} 即可
+        script.async = true
+      }
+      script.onerror = reject
+      script.onload = script.onreadystatechange = function () {
+        const loadState = this.readyState
+        if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+        script.onload = script.onreadystatechange = null
+        resolve()
+      }
+      document.head.appendChild(script)
+    }),
+
+    jq: (fn) => {
+      if (typeof jQuery === 'undefined') {
+        utils.js(deps.jquery).then(fn)
+      } else {
+        fn()
+      }
+    },
+
+    onLoading: (el) => {
+      if (el) {
+        $(el).append('<div class="loading-wrap"><svg xmlns="http://www.w3.org/2000/svg" width="2em" height="2em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"><path stroke-dasharray="60" stroke-dashoffset="60" stroke-opacity=".3" d="M12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="1.3s" values="60;0"/></path><path stroke-dasharray="15" stroke-dashoffset="15" d="M12 3C16.9706 3 21 7.02944 21 12"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.3s" values="15;0"/><animateTransform attributeName="transform" dur="1.5s" repeatCount="indefinite" type="rotate" values="0 12 12;360 12 12"/></path></g></svg></div>');
+      }
+    },
+    onLoadSuccess: (el) => {
+      if (el) {
+        $(el).find('.loading-wrap').remove();
+      }
+    },
+    onLoadFailure: (el) => {
+      if (el) {
+        $(el).find('.loading-wrap svg').remove();
+        $(el).find('.loading-wrap').append('<svg xmlns="http://www.w3.org/2000/svg" width="2em" height="2em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path stroke-dasharray="60" stroke-dashoffset="60" d="M12 3L21 20H3L12 3Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.5s" values="60;0"/></path><path stroke-dasharray="6" stroke-dashoffset="6" d="M12 10V14"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="6;0"/></path></g><circle cx="12" cy="17" r="1" fill="currentColor" fill-opacity="0"><animate fill="freeze" attributeName="fill-opacity" begin="0.8s" dur="0.4s" values="0;1"/></circle></svg>');
+        $(el).find('.loading-wrap').addClass('error');
+      }
+    },
+    request: (el, url, callback, onFailure) => {
+      const maxRetry = 3;
+      let retryCount = 0;
+
+      return new Promise((resolve, reject) => {
+        const load = () => {
+          utils.onLoading?.(el);
+
+          let timedOut = false;
+          const timeout = setTimeout(() => {
+            timedOut = true;
+            console.warn('[request] 超时:', url);
+
+            if (++retryCount >= maxRetry) {
+              utils.onLoadFailure?.(el);
+              onFailure?.();
+              reject('请求超时');
+            } else {
+              setTimeout(load, 1000);
+            }
+          }, 5000);
+
+          fetch(url).then(resp => {
+            if (timedOut) return;
+            clearTimeout(timeout);
+
+            if (!resp.ok) throw new Error('响应失败');
+            return resp;
+          }).then(data => {
+            if (timedOut) return;
+            utils.onLoadSuccess?.(el);
+            callback(data);
+            resolve(data);
+          }).catch(err => {
+            clearTimeout(timeout);
+            console.warn('[request] 错误:', err);
+
+            if (++retryCount >= maxRetry) {
+              utils.onLoadFailure?.(el);
+              onFailure?.();
+              reject(err);
+            } else {
+              setTimeout(load, 1000);
+            }
+          });
+        };
+
+        load();
+      });
+    },
+    requestWithoutLoading: (url, options = {}, maxRetry = 2, timeout = 5000) => {
+      return new Promise((resolve, reject) => {
+        let retryCount = 0;
+
+        const tryRequest = () => {
+          let timedOut = false;
+          const timer = setTimeout(() => {
+            timedOut = true;
+            if (++retryCount > maxRetry) reject('timeout');
+            else tryRequest();
+          }, timeout);
+
+          fetch(url, options)
+            .then(resp => {
+              clearTimeout(timer);
+              if (!resp.ok) throw new Error('bad response');
+              resolve(resp);
+            })
+            .catch(err => {
+              clearTimeout(timer);
+              if (++retryCount > maxRetry) reject(err);
+              else setTimeout(tryRequest, 500);
+            });
+        };
+
+        tryRequest();
+      });
+    },
+    /********************** requestAnimationFrame ********************************/
+    // 1、requestAnimationFrame 会把每一帧中的所有 DOM 操作集中起来，在一次重绘或回流中就完成，并且重绘或回流的时间间隔紧紧跟随浏览器的刷新频率，一般来说，这个频率为每秒60帧。
+    // 2、在隐藏或不可见的元素中，requestAnimationFrame 将不会进行重绘或回流，这当然就意味着更少的的 cpu，gpu 和内存使用量。
+    requestAnimationFrame: (fn) => {
+      if (!window.requestAnimationFrame) {
+        window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame;
+      }
+      window.requestAnimationFrame(fn)
+    },
+    dark: {},
+  };
+
+  // utils.dark.mode 当前模式 dark or light
+  // utils.dark.toggle() 暗黑模式触发器
+  // utils.dark.push(callBack[,"callBackName"]) 传入触发器回调函数
+  utils.dark.method = {
+    toggle: new RunItem(),
+  };
+  utils.dark = Object.assign(utils.dark, {
+    push: utils.dark.method.toggle.push,
+  });
+</script>
+<script>
+  const sidebar = {
+    leftbar: () => {
+      if (l_body) {
+        l_body.toggleAttribute('leftbar');
+        l_body.removeAttribute('rightbar');
+      }
+    },
+    rightbar: () => {
+      if (l_body) {
+        l_body.toggleAttribute('rightbar');
+        l_body.removeAttribute('leftbar');
+      }
+    },
+    dismiss: () => {
+      if (l_body) {
+        l_body.removeAttribute('leftbar');
+        l_body.removeAttribute('rightbar');
+      }
+    },
+    toggleTOC: () => {
+      document.querySelector('#data-toc').classList.toggle('collapse');
+    }
+  }
+</script>
+<script type="text/javascript">
+  (() => {
+    const tagSwitchers = document.querySelectorAll('.tag-subtree.parent-tag > a > .tag-switcher-wrapper')
+    for (const tagSwitcher of tagSwitchers) {
+      tagSwitcher.addEventListener('click', (e) => {
+        const parent = e.target.closest('.tag-subtree.parent-tag')
+        parent.classList.toggle('expanded')
+        e.preventDefault()
+      })
+    }
+
+    // Get active tag from query string, then activate it.
+    const urlParams = new URLSearchParams(window.location.search)
+    const activeTag = urlParams.get('tag')
+    if (activeTag) {
+      let tag = document.querySelector(`.tag-subtree[data-tag="${activeTag}"]`)
+      if (tag) {
+        tag.querySelector('a').classList.add('active')
+        
+        while (tag) {
+          tag.classList.add('expanded')
+          tag = tag.parentElement.closest('.tag-subtree.parent-tag')
+        }
+      }
+    }
+  })()
+</script>
+
+<script async src="https://gcore.jsdelivr.net/npm/vanilla-lazyload@19.1/dist/lazyload.min.js"></script>
+<script>
+  // https://www.npmjs.com/package/vanilla-lazyload
+  // Set the options globally
+  // to make LazyLoad self-initialize
+  window.lazyLoadOptions = {
+    elements_selector: ".lazy",
+    callback_loaded: (el) => {
+      el.classList.add('loaded');
+      const wrapper = el.closest('.lazy-box');
+      const icon = wrapper?.querySelector('.lazy-icon');
+      if (icon) icon.remove();
+    }
+  };
+  // Listen to the initialization event
+  // and get the instance of LazyLoad
+  window.addEventListener(
+    "LazyLoad::Initialized",
+    function (event) {
+      window.lazyLoadInstance = event.detail.instance;
+    },
+    false
+  );
+  document.addEventListener('DOMContentLoaded', function () {
+    window.lazyLoadInstance?.update();
+  });
+
+  window.wrapLazyloadImages = (container) => {
+    if (typeof container === 'string') {
+      container = document.querySelector(container);
+    }
+    if (!container) return;
+    
+    const images = container.querySelectorAll('img');
+    images.forEach((img) => {
+      if (img.classList.contains('lazy')) return;
+
+      const src = img.getAttribute('src');
+      if (!src) return;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'lazy-box';
+
+      const newImg = img.cloneNode();
+      newImg.removeAttribute('src');
+      newImg.setAttribute('data-src', src);
+      newImg.classList.add('lazy');
+
+      const icon = document.createElement('div');
+      icon.className = 'lazy-icon';
+      if (def.loading) {
+        icon.style.backgroundImage = `url("${def.loading}")`;
+      }
+
+      wrapper.appendChild(newImg);
+      wrapper.appendChild(icon);
+
+      img.replaceWith(wrapper);
+    });
+
+    // 通知 LazyLoad 更新
+    if (window.lazyLoadInstance?.update) {
+      window.lazyLoadInstance.update();
+    }
+  }
+  
+</script>
+
+<!-- required -->
+<script src="/js/main.js?v=1.33.1" defer></script>
+
+<script type="text/javascript">
+  const applyTheme = (theme) => {
+    if (theme === 'auto') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', theme)
+    }
+
+    // applyThemeToGiscus(theme)
+  }
+
+  // FIXME: 这会导致无法使用 preferred_color_scheme 以外的主题
+  const applyThemeToGiscus = (theme) => {
+    // theme = theme === 'auto' ? 'preferred_color_scheme' : theme
+    const cmt = document.getElementById('giscus')
+    if (cmt) {
+      // This works before giscus load.
+      cmt.setAttribute('data-theme', theme)
+    }
+
+    const iframe = document.querySelector('#comments > section.giscus > iframe')
+    if (iframe) {
+      // This works after giscus loaded.
+      const src = iframe.src
+      const newSrc = src.replace(/theme=[\w]+/, `theme=${theme}`)
+      iframe.src = newSrc
+    }
+  }
+
+  const switchTheme = () => {
+    // light -> dark -> auto -> light -> ...
+    const currentTheme = document.documentElement.getAttribute('data-theme')
+    let newTheme;
+    switch (currentTheme) {
+      case 'light':
+        newTheme = 'dark'
+        break
+      case 'dark':
+        newTheme = 'auto'
+        break
+      default:
+        newTheme = 'light'
+    }
+    applyTheme(newTheme)
+    window.localStorage.setItem('Stellar.theme', newTheme)
+    utils.dark.mode = newTheme === 'auto' ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : newTheme;
+    utils.dark.method.toggle.start();
+
+    const messages = {
+      light: `切换到浅色模式`,
+      dark: `切换到深色模式`,
+      auto: `切换到跟随系统配色`,
+    }
+    hud?.toast?.(messages[newTheme])
+  }
+
+  (() => {
+    // Apply user's preferred theme, if any.
+    const theme = window.localStorage.getItem('Stellar.theme')
+    if (theme !== null) {
+      applyTheme(theme)
+    } else {
+      utils.dark.mode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    utils.dark.method.toggle.start();
+  })()
+</script>
+
+
+<!-- optional -->
+
+  <script type="module">
+  const el = document.querySelector('#comments #giscus');
+  util.viewportLazyload(el, load_discus, false);
+
+  function load_discus() {
+    if (!el) return;
+    try {
+        el.innerHTML = '';
+      } catch (error) {
+        console.error(error);
+      }
+      const script = document.createElement('script');
+      script.async = true;
+      for (const key of Object.keys(el.attributes)) {
+        const attr = el.attributes[key];
+        if (['class', 'id'].includes(attr.name) === false) {
+          script.setAttribute(attr.name, attr.value);
+        }
+      }
+      el.appendChild(script);
+  }
+</script>
+
+
+
+
+<script defer>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    ctx.services = Object.assign({}, JSON.parse(`{"mdrender":{"js":"/js/services/mdrender.js"},"siteinfo":{"js":"/js/services/siteinfo.js","api":null},"ghinfo":{"js":"/js/services/ghinfo.js"},"rating":{"js":"/js/services/rating.js","api":"https://star-vote.xaox.cc/api/rating"},"vote":{"js":"/js/services/vote.js","api":"https://star-vote.xaox.cc/api/vote"},"sites":{"js":"/js/services/sites.js"},"friends":{"js":"/js/services/friends.js"},"friends_and_posts":{"js":"/js/services/friends_and_posts.js"},"timeline":{"js":"/js/services/timeline.js"},"fcircle":{"js":"/js/services/fcircle.js"},"weibo":{"js":"/js/services/weibo.js"},"memos":{"js":"/js/services/memos.js"},"voice":{"js":"/js/plugins/voice.js"},"video":{"js":"/js/plugins/video.js"},"download-file":{"js":"/js/plugins/download-file.js"},"twikoo":{"js":"/js/services/twikoo_latest_comment.js"},"waline":{"js":"/js/services/waline_latest_comment.js"},"artalk":{"js":"/js/services/artalk_latest_comment.js"},"giscus":{"js":"/js/services/giscus_latest_comment.js"},"contributors":{"edit_this_page":{"_posts/":null,"wiki/stellar/":"https://github.com/xaoxuu/hexo-theme-stellar-docs/blob/main/"},"js":"/js/services/contributors.js"}}`));
+    for (let id of Object.keys(ctx.services)) {
+      const js = ctx.services[id].js;
+      if (id == 'siteinfo') {
+        ctx.cardlinks = document.querySelectorAll('a.link-card[cardlink]');
+        if (ctx.cardlinks?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            setCardLink(ctx.cardlinks);
+          });
+        }
+      } else if (id == 'voice') {
+        ctx.voiceAudios = document.querySelectorAll('.voice>audio');
+        if (ctx.voiceAudios?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            createVoiceDom(ctx.voiceAudios);
+          });
+        }
+      } else if (id == 'video') {
+        ctx.videos = document.querySelectorAll('.video>video');
+        if (ctx.videos?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            videoEvents(ctx.videos);
+          });
+        }
+      } else if (id == 'download-file') {
+        ctx.files = document.querySelectorAll('.file');
+        if (ctx.files?.length > 0) {
+          utils.js(js, { defer: true }).then(function () {
+            downloadFileEvent(ctx.files);
+          });
+        }
+      } else {
+        const els = document.getElementsByClassName(`ds-${id}`);
+        if (els?.length > 0) {
+          utils.jq(() => {
+            if (id == 'timeline' || 'memos' || 'marked') {
+              utils.js(deps.marked).then(function () {
+                utils.js(js, { defer: true });
+              });
+            } else {
+              utils.js(js, { defer: true });
+            }
+          });
+        }
+      }
+    }
+
+    // chat iphone time
+    let phoneTimes = document.querySelectorAll('.chat .status-bar .time');
+
+    if (phoneTimes.length > 0) {
+      NowTime();
+      var date = new Date();
+      var sec = date.getSeconds();
+      var firstAdjustInterval = setInterval(firstAdjustTime, 1000 * (60 - sec));
+    }
+
+    function firstAdjustTime() {
+      NowTime();
+      clearInterval(firstAdjustInterval);
+      setInterval(NowTime, 1000 * 60);
+    }
+
+    function NowTime() {
+      for (let i = 0; i < phoneTimes.length; ++i) {
+        var timeSpan = phoneTimes[i];
+        var date = new Date();
+        var hour = date.getHours();
+        var min = date.getMinutes();
+        timeSpan.innerHTML = check(hour) + ":" + check(min);
+      }
+    };
+
+    function check(val) {
+      if (val < 10) {
+        return ("0" + val);
+      }
+      return (val);
+    }
+
+    // chat quote
+    const chat_quote_obverser = new IntersectionObserver((entries, observer) => {
+      entries.filter((entry) => { return entry.isIntersecting }).sort((a, b) => a.intersectionRect.y !== b.intersectionRect.y ? a.intersectionRect.y - b.intersectionRect.y : a.intersectionRect.x - b.intersectionRect.x).forEach((entry, index) => {
+          observer.unobserve(entry.target);
+          setTimeout(() => {
+            entry.target.classList.add('quote-blink');
+            setTimeout(() => {
+              entry.target.classList.remove('quote-blink');
+            }, 1000);
+          }, Math.max(100, 16) * (index + 1));
+        });
+    });
+
+    var chatQuotes = document.querySelectorAll(".chat .talk .quote");
+    chatQuotes.forEach((quote) => {
+      quote.addEventListener('click', function () {
+        var chatCellDom = document.getElementById("quote-" + quote.getAttribute("quotedCellTag"));
+        if (chatCellDom) {
+          var chatDiv = chatCellDom.parentElement;
+          var mid = chatDiv.clientHeight / 2;
+          var offsetTop = chatCellDom.offsetTop;
+          if (offsetTop > mid - chatCellDom.clientHeight / 2) {
+            chatDiv.scrollTo({
+              top: chatCellDom.offsetTop - mid + chatCellDom.clientHeight / 2,
+              behavior: "smooth"
+            });
+          } else {
+            chatDiv.scrollTo({
+              top: 0,
+              behavior: "smooth"
+            });
+          }
+          chat_quote_obverser.observe(chatCellDom);
+        }
+      });
+    });
+  });
+</script>
+
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    ctx.search = {
+      path: `/search.json`,
+    }
+    utils.js('/js/search/local-search.js', { defer: true });
+  });
+</script><script>
+  window.FPConfig = {
+    delay: 0,
+    ignoreKeywords: [],
+    maxRPS: 5,
+    hoverDelay: 25
+  };
+</script>
+<script defer src="https://gcore.jsdelivr.net/npm/flying-pages@2/flying-pages.min.js"></script><script>
+  ctx.fancybox = {
+    selector: `.timenode p>img`,
+    css: `https://gcore.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css`,
+    js: `https://gcore.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js`
+  };
+  var selector = '[data-fancybox]:not(.error), .with-fancybox .atk-content img:not([atk-emoticon])';
+  if (ctx.fancybox.selector) {
+    selector += `, ${ctx.fancybox.selector}`
+  }
+  var needFancybox = document.querySelectorAll(selector).length !== 0;
+  if (!needFancybox) {
+    const memos = document.getElementsByClassName('ds-memos');
+    if (memos != undefined && memos.length > 0) {
+      needFancybox = true;
+    }
+    const fancybox = document.getElementsByClassName('with-fancybox');
+    if (fancybox != undefined && fancybox.length > 0) {
+      needFancybox = true;
+    }
+  }
+  if (needFancybox) {
+    utils.css(ctx.fancybox.css);
+    utils.js(ctx.fancybox.js, { defer: true }).then(function () {
+      Fancybox.bind(selector, {
+        hideScrollbar: false,
+        Thumbs: {
+          autoStart: false,
+        },
+        caption: (fancybox, slide) => {
+          return slide.triggerEl.alt || slide.triggerEl.dataset.caption || null
+        }
+      });
+    })
+  }
+</script>
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    const swiper_api = document.getElementById('swiper-api');
+    if (swiper_api != undefined) {
+      utils.css(`https://unpkg.com/swiper@10.3/swiper-bundle.min.css`);
+      utils.js(`https://unpkg.com/swiper@10.3/swiper-bundle.min.js`, { defer: true }).then(function () {
+        const effect = swiper_api.getAttribute('effect') || '';
+        var swiper = new Swiper('.swiper#swiper-api', {
+          slidesPerView: 'auto',
+          spaceBetween: 8,
+          centeredSlides: true,
+          effect: effect,
+          rewind: true,
+          pagination: {
+            el: '.swiper-pagination',
+            clickable: true,
+          },
+          navigation: {
+            nextEl: '.swiper-button-next',
+            prevEl: '.swiper-button-prev',
+          },
+        });
+      })
+    }
+  });
+</script>
+
+<script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.6/MathJax.js?config=TeX-AMS-MML_HTMLorMML" async></script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      processEscapes: true
+    }
+  });
+  MathJax.Hub.Config({
+    tex2jax: {
+      skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    }
+  });
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    window.codeElements = document.querySelectorAll('.code');
+    if (window.codeElements.length > 0) {
+      ctx.copycode = {
+        default_text: `Copy`,
+        success_text: `Copied`,
+        toast: `复制成功`,
+      };
+      utils.js('/js/plugins/copycode.js');
+    }
+  });
+</script>
+
+
+<!-- inject -->
+
+</div></body></html>
